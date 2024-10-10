@@ -1,0 +1,190 @@
+---
+title: "Lab 1Tid"
+format: html
+editor: visual
+---
+
+## 2 Dealing with time series data
+
+Everything that exists is an object
+
+Everything that happens is a function call
+
+### 2.1 The "ts"object class
+
+```{r}
+data("AirPassengers")
+AP <-  AirPassengers
+AP
+class(AP)
+#verify data frame is stored as a time series object.
+methods(class = "ts")
+#To find out what fuctions work with our "ts" object
+setwd("/Users/minhui/Documents/Lab 1Tid")
+
+maine_month <- read.table("Maine.dat",header = TRUE)
+class(maine_month)
+
+maine_month_ts <- ts(
+  maine_month$unemploy,
+  start =c(1996,1),
+  freq =12
+  )
+class(maine_month_ts)
+```
+
+## 3 Visualizing time series data
+
+### 3.1 Basic plots for time series data
+
+```{r}
+plot(
+  maine_month_ts,
+  ylab ="Unemployment",
+  xlab ="", #to remove the x label
+  main ="Monthly unemployment rates in Maine"
+  )
+```
+
+```{r}
+boxplot(
+  maine_month_ts~cycle(maine_month_ts), # cycle explore seasonality - creating a new covariate that takes one value for all observations corresponding to the same season.
+  ylab ="Unemployment",
+  xlab ="Month (1 = January, 2 = February, etc.)")
+
+```
+
+### 3.2 Plotting the components of a time series(optional)
+
+```{r}
+maine_decomposed <- decompose (
+  maine_month_ts,
+  type = "additive"
+)
+names(maine_decomposed)
+
+maine_fitted<-maine_decomposed$seasonal + maine_decomposed$trend 
+ts.plot(maine_month_ts, maine_fitted)
+
+plot(maine_decomposed)
+
+```
+
+### 3.3Correlograms
+
+```{r}
+acf(
+  maine_decomposed$random[-c(1:6,123:128)],
+  main ="Correlogram for the Maine data"
+  ) #Removing the trend and seasonality from a time series does not get rid of all serial correlation. acf() to create a correlogram, which shows the serial correlation for different lags. it takes the same main = argument as the plot() fuction.
+```
+
+```{r}
+acf(maine_decomposed$random[-c(1:6,123:128)],plot =FALSE) #False: extraxct the exact auticorrelations without getting a plot
+```
+
+### Cross correlogram
+
+use ts.union() to bind two time series with the same frequency together
+
+acf() on two time series that have been combined in this way, we will get correlograms for each time series, together with a cross correlogram. If we just want the cross correlation we can use ccf()
+
+## 4 Testing stationarity - The Dickey- Fuller Test
+
+```{r}
+#install.packages("tseries")
+library(tseries)
+adf.test(maine_decomposed$random[-c(1:6,123:128)])
+```
+
+we can also test the original time series, which we strongly suspect has a seasonal component which means that it is not stationary. Based on the test, we cannot reject the null of non-stationarity.
+
+```{r}
+adf.test(maine_month_ts)
+```
+
+## 5 Exponential smoothing
+
+### 5.1 Simple exponential smoothing ( no trend, no season)
+
+```{r}
+plot(
+  UKDriverDeaths,
+  main ="Driver deaths in the UK",
+  ylab ="Deaths",
+  xlab =""
+  )
+```
+
+```{r}
+ses1<-HoltWinters(
+  UKDriverDeaths,
+  alpha =0.2,
+  beta =FALSE,
+  gamma =FALSE
+  )
+ses1
+plot(ses1)
+```
+
+```{r}
+plot(
+  ses1$x-ses1$fitted[,"xhat"],
+  ylab ="x - xhat")
+```
+
+```{r}
+HoltWinters(
+  UKDriverDeaths,
+  beta =FALSE,
+  gamma =FALSE
+  )
+```
+
+### 5.2 Holt-Winters method without season
+
+```{r}
+hw1<-HoltWinters(
+  UKDriverDeaths,
+  gamma =FALSE
+  )
+hw1
+plot(hw1)
+```
+
+```{r}
+plot(
+  hw1$x-hw1$fitted[,"xhat"],
+  ylab ="x - xhat")
+```
+
+## 5.3 Holt-Winters method
+
+```{r}
+hw2 <- HoltWinters(
+  UKDriverDeaths
+)
+hw2
+plot(hw2)
+
+plot(
+  hw2$x-hw2$fitted[,"xhat"],
+  ylab ="x - xhat"
+  )
+
+```
+
+### 5.3.1 A note on the HoltWinters() fuction
+
+The values under fitted are somewhat confusing. The values of level and trend are for the previous time period. The final level and trend can be found under coefficients.
+
+## 6 Forecast evaluation
+
+```{r}
+UKDriverDeathsTrain <- window(
+  UKDriverDeaths,
+  Start = start(UKDriverDeaths),
+  end = c(1984, 11)
+)
+hw1 <- HoltWinters(UKDriverDeathsTrain, beta = FALSE, gamma = FALSE)
+```

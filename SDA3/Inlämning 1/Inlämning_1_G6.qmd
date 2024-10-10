@@ -1,0 +1,346 @@
+---
+title: "Statistik och dataanalys III, VT2024"
+subtitle: "Inlämningsuppgift 1"
+author: 
+- Leo Wiberg
+- Minhui Zhong
+- Yimei Jiang
+date: last-modified
+format: 
+  html:
+    self-contained: true
+  pdf: default  
+  docx: default
+toc: true
+language: 
+  title-block-author-single: " "
+toc-title-document: "Innehåll"
+crossref-fig-title: "Figur"
+theme: Superhero
+title-block-banner-color: Primary
+title-block-published: "Publicerad"
+callout-warning-caption: "Varning"
+callout-note-caption: "Observera"
+callout-tip-caption: "Tips"
+editor: visual
+---
+
+```{r}
+# Den här inlämningsuppgiften förutsätter att följande paket finns installerade:
+
+install.packages("latex2exp")
+
+library(ggplot2)
+
+library(plotly)
+
+library(latex2exp)
+
+library(SUdatasets)
+
+library(mvtnorm)
+```
+
+# **Del 1 - En Kort Uppgift**
+
+## Uppgift 1.1
+
+```{r}
+#Jennifer i kod
+pbinom(2, 5, 1/13) - pbinom(1, 5, 1/13 ) 
+
+#Michel i kod
+phyper(2, 4, 48, 5) - phyper(1, 4, 48, 5)
+
+```
+
+Jennifers sannolikhet följer en binomialfördelning eftersom att hon lägger tillbaka korten. Sannolikheten förblir densamma vid varje kortdragning. Binomialfördelningen har parametrarna *Y \~ Bin (5, 1/13)* då hon drar *n=5* kort och sannolikheten att dra ett ess förblir *p = 1/13* för alla dragningar.
+
+Uträkning för sannolikhet:
+
+![](images/Screenshot%202024-02-18%20at%2015.34.02.png)
+
+Michel följer istället en hypergeometrisk fördelning då han inte lägger tillbaka korten. Den hypergeometriska fördelningen har parametrarna *Y \~ 𝐻𝑦𝑝(52,5,4)* då det finns *N=52* kort i populationen, *n=5* valda kort och *r=4* kort i kortleken med “egenskapen” ess.
+
+Uträkning för sannolikhet:
+
+![](images/Screenshot%202024-02-18%20at%2015.35.36.png)
+
+Sammanfattningsvis så kan vi säga att båda parter har räknat ut rätt sannolikheter för sina egna metoder att dra kort.
+
+## Uppgift 1.2
+
+```{r}
+antal_ess=0:15
+
+Jennifers = dbinom(antal_ess, 5, 1/13)
+Michel = dhyper(antal_ess, 4, 48, 5)
+Jennifers15 = dbinom(antal_ess, 15, 1/13)
+Michel15 = dhyper(antal_ess, 4, 48, 15)
+
+df = data.frame(x = antal_ess, Jennifer = Jennifers, michel = Michel, Jen15=Jennifers15, Mic15=Michel15)
+
+library(ggplot2)
+ggplot(df, aes(x = x)) + 
+  geom_line(aes(y = Jennifer, color = "Jennifer 5 dragningar"), linewidth = 1) + 
+  geom_line(aes(y = Michel, color = "Michel 5 dragningar"), linewidth = 1) + 
+  geom_line(aes(y = Jen15, color = "Jennifer 15 dragningar"), linewidth = 1) +
+  geom_line(aes(y = Mic15, color = "Michel 15 dragningar"), linewidth = 1) + 
+  theme_minimal() +
+  xlab("Antal ess dragna") +
+  ylab("Sannolikhet") + 
+  scale_color_manual(name = "Linjer", 
+                     values = c("Jennifer 5 dragningar" = "green4", 
+                                "Michel 5 dragningar" = "yellow2", 
+                                "Jennifer 15 dragningar" = "orange", 
+                                "Michel 15 dragningar" = "red"))
+
+```
+
+Ovan visas en graf över antal ess dragna på x-axeln och sannolikheten att dra det antalet på y-axeln. 
+
+De två linjerna som ligger på y-värdet 0.65 vid x-värdet 0 och sjunker sedan hastigt är för fem dragna kort. Fördelningen av sannolikheter för Jennifer och Michel är i princip lika i detta fall och är ungefär 0 för mer än 2 dragna ess. När de istället drar 15 kort finns en liten skillnad i sannolikhet. Båda har störst sannolikhet att dra 1 ess men Jennifer har en bredare sannolikhetsfördelning än Michel. Michel har en sannolikhet på exakt 0 att dra mer än 4 ess, vilket kan förklaras av att det endast finns fyra möjliga ess han kan dra. Jennifers sannolikhet att dra mer än 4 ess är väldigt liten, om än befintlig.
+
+## Uppgift 1.3
+
+```{r}
+antal_ess_30=0:30
+
+Jennifers = dbinom(antal_ess_30, 5, 4/13)
+Michels = dhyper(antal_ess_30, 16, 36, 5)
+Jennifers15 = dbinom(antal_ess_30, 15, 4/13)
+Michels15 = dhyper(antal_ess_30, 16, 36, 15)
+Jennifers30 = dbinom(antal_ess_30, 30, 4/13)
+Michels30 = dhyper(antal_ess_30, 16, 36, 30)
+
+df2 = data.frame(x = antal_ess_30, Jennifer = Jennifers, Michel = Michels, Jen15=Jennifers15, Mic15=Michels15, Jen30 = Jennifers30, Mic30 = Michels30)
+
+
+ggplot(df2, aes(x=x)) + 
+  geom_line(aes(y = Jennifer, color ="Jennifer 5 dragningar"), linewidth = 1) +
+  geom_line(aes(y = Michel, color = "Michel 5 dragningar"), linewidth = 1) + 
+  geom_line(aes(y = Jen15, color = "Jennifer 15 dragningar"), linewidth = 1) +
+  geom_line(aes(y = Mic15, color = "Michel 15 dragningar"), linewidth = 1) + 
+  geom_line(aes(y = Jen30, color = "Jennifer 30 dragningar"), linewidth = 1) +
+  geom_line(aes(y = Mic30, color = "Michel 30 dragningar"), linewidth = 1) + 
+  theme_minimal() +
+  xlab("Antal dragna ess, kungar, damer och knäcktar") +
+  ylab("Sannolikhet") +
+  scale_color_manual(name = "Linjer", 
+                     values = c("Jennifer 5 dragningar" = "green4", 
+                                "Michel 5 dragningar" = "yellow2", 
+                                "Jennifer 15 dragningar" = "orange",
+                                "Michel 15 dragningar" = "red", 
+                                "Jennifer 30 dragningar" = "darkred",
+                                "Michel 30 dragningar" = "brown"))
+
+```
+
+Vi ser tre par av linjer för Jennifer och Michels sannolikheter. Det första paret som har störst sannolikhet vid ett lyckat kort är försöken där de drar fem kort var. Deras sannolikhetsfördelningar ser väldigt lika ut även om Jennifer har en något bredare fördelning. 
+
+Det andra paret av linjer, deras sannolikhetsfördelningar vid 15 dragna kort, har olika toppar. Jennifer har störst sannolikhet att dra fyra lyckade kort medan Michel har något större sannolikhet att dra fem kort. Återigen är Jennifers fördelning bredare.
+
+Det tredje paret av linjer representerar 30 dragningar och där har båda personer störst sannolikhet att dra 9 lyckade kort. Jennifers är återigen bredare.
+
+Jennifers bredare fördelning beror på faktumet att hon har en binomialfördelning. De kort hon dragit tidigare påverkar inte hennes nästa dragning. Dragningarna är oberoende och har därmed en varians *V(Jen) = npq = 28n/169.* Michels dragning är dock starkt beroende på hans tidigare dragningar vilket leder till en smalare varians:
+
+![](images/Screenshot%202024-02-18%20at%2015.46.32.png)
+
+## Uppgift 1.4
+
+```{r}
+sim_nummer=integer(length = 16)
+Jen_sim_15 = rbinom(1000, 15, 4/13)
+
+for (j in 0:15){sim_nummer[j+1] = sum(Jen_sim_15==j)/1000}
+
+names(sim_nummer) = 0:15
+barplot(sim_nummer, col = "orange", ylim = c(0,0.3), ylab = "P(Y=y)", xlab = "y = Antal dragna knäcktar, damer, kungar och ess", main = "1000 simulationer av Jennifers dragningar Y ~ Binom(15,4/13)")
+
+
+sim_nummer_Mic=integer(length = 16)
+Mic_sim_15 = rhyper(nn = 1000, m = 16, n = 36, k = 15 )
+
+for (j in 0:16){sim_nummer_Mic[j+1] = sum(Mic_sim_15==j)/1000}
+
+names(sim_nummer_Mic) = 0:15
+barplot(sim_nummer_Mic, col = "blue", ylim = c(0,0.3), ylab = "P(Y=y)", xlab = "y = Antal dragna knäcktar, damer, kungar och ess", main = "1000 simulationer av Michels dragningar Y ~ Binom(52, 15, 16")
+
+```
+
+Simuleringarna ser ut att stämma överens med de teoretiska fördelningarna.
+
+## Uppgift 1.5
+
+```{r}
+#Medelvärde enligt definition för binomialfördelning: n gånger p
+15*4/13
+
+#Standardavvikelse enligt definition för binomialfördelning: roten ur (n gånger p gånger 1-p)
+sqrt(15*(4/13)*(9/13))
+
+approximativ = dnorm(antal_ess, 4.615385, 1.787531)
+
+df3 = data.frame(x = antal_ess, Jens_sim = sim_nummer, Jens_aprox = approximativ, Jen15 = Jennifers15[0:16])
+
+ggplot(df3, aes(x=x)) + 
+  geom_line(aes(y = Jens_sim, color ="Simulering"), size = 2) +
+  geom_line(aes(y = Jens_aprox, color ="Normalfördelning"), size = 2) + 
+  geom_line(aes(y = Jen15, color ="Teoretisk Binomialfördelning"), size = 2) +
+  theme_minimal() +
+  xlab("Antal dragna ess, kungar, damer och knäcktar") +
+  ylab("Sannolikhet") +
+  scale_color_manual(name = "Fördelningar", 
+                    values = c("Simulering" = "yellow2", 
+                               "Normalfördelning" = "orange", 
+                               "Teoretisk Binomialfördelning" = "red"))
+
+#Teoretisk sannolikhet för 3 lyckade försök
+dbinom(3, 15, 4/13)
+#Teoretisk sannolikhet för 4 lyckade försök
+dbinom(4, 15, 4/13)
+
+#Simulerad sannolikhet för 3 lyckade försök
+mean(Jen_sim_15 == 3)
+#Simulerad sannolikhet för 4 lyckade försök
+mean(Jen_sim_15 == 4)
+
+#Approximativ sannolikhet för 3 lyckade försök
+dnorm(3, 4.615385, 1.787531)
+#Approximativ sannolikhet för 4 lyckade försök
+dnorm(4, 4.615385, 1.787531)
+
+```
+
+Att dra 15 kort ger följande väntevärde och standardavvikelse enligt definitionen för binomialfördelningar:
+
+![](images/Screenshot%202024-02-18%20at%2015.48.49.png)
+
+Approximativ sannolikhet beräknas på följande sätt:
+
+$f(3)≈ {1\over 1.787531 {\sqrt 2 \pi}}e^{-{{(3-4.615385)^2}\over2 \times 1.787531^2}}≈0.14836$$f(4)≈ {1\over 1.787531 {\sqrt 2 \pi}}e^{-{{(4-4.615385)^2}\over2 \times 1.787531^2}}≈0.21034$\
+
+Den simulerade sannolikheten varierar varje gång man läser in detta dokument men stämmer bra överens med den teoretiska då vi prövat den. Den approximativa avviker alltså mest. Ett annat problem med den approximativa är att normalfördelningen gäller för kontinuerliga variabler, men denna är diskret. Detta innebär några problem. De totala sannolikheterna för 0-15 lyckade blir inte 1 (det blir ca 0.998) och det finns sannolikheter för bråk och negativa tal.
+
+# **Del 2 - Poissonregression och Maximum likelihood**
+
+## Uppgift 2.1
+
+```{r}
+install.packages("remotes")
+library(remotes)
+install_github("StatisticsSU/SUdatasets", force = TRUE)
+library(SUdatasets)
+
+# dataset
+df_doctor_visits = doctorvisits
+
+head(df_doctor_visits)
+
+summary(df_doctor_visits)
+
+# Utforska fördelningen av variablerna med histogram
+hist(df_doctor_visits$age, main = "Histogram of Age")
+
+```
+
+## Uppgift 2.2
+
+Vi har valt ut variablerna age som ska användas i en Poisson Regression där numvisits är responsvariabel. Anledningar till detta eftersom det är en viktig faktor som har en viktig koppling till beteende mönster och konsumtionsvanor. Det är rimligt att anta hur ålder kan påverka antalet besök på platser. Det är också lätt att samla in och använda i analyser.
+
+## Uppgift 2.3
+
+```{r}
+#loglikelihood för Poisson Regression
+loglikelihoodfunc <- function(lambda) sum(dpois(x = df_doctor_visits$numvisit, lambda = lambda, log = TRUE))
+```
+
+## Uppgift 2.4
+
+```{r}
+install.packages("plot_ly")
+library("plotly")
+
+#loglikelihood för Poisson Regression
+likelilambda <- function(B0, B1) {
+  return(sum(dpois(df_doctor_visits$numvisit, lambda = exp(B0 + B1 * df_doctor_visits$age), log = TRUE)))
+}
+
+#Grid på x och y_axlarna
+B0Grid<-seq(0.2, 0.7,length =100)
+B1Grid<-seq(-0.15, 0.1,length =100)
+
+likeli_values <- outer(X = B0Grid, Y = B1Grid, FUN = Vectorize(likelilambda))
+
+#plotta figuren
+plot_ly(x =B1Grid, y =B0Grid, z =likeli_values, type ="surface")
+
+```
+
+## Uppgift 2.5
+
+```{r}
+loglik_poisreg <- function(betavect, y, x) { 
+  lambda = exp(betavect[1] + betavect[2] * df_doctor_visits$age) 
+  loglik = sum(dpois(y, lambda, log = TRUE)) 
+  return(loglik) 
+  }
+
+y = df_doctor_visits$numvisit 
+x = df_doctor_visits$age 
+initVal = c(1,1) 
+optRes <- optim(initVal, loglik_poisreg, gr=NULL, y,x, control=list(fnscale=-1), method= "BFGS", hessian=TRUE) 
+
+mle = optRes$par
+
+r_ML = mle[1]
+mu_ML= mle[2]
+r_ML
+mu_ML
+
+```
+
+## Uppgift 2.6
+
+```{r}
+#approximativa kovariansmatris
+mle_cov = solve(-optres$hessian)
+mle_cov
+
+mle_cov[1,1]
+se_r = sqrt(mle_cov[1,1])
+se_mu = sqrt(mle_cov[2,2])
+
+#95%igt KI för r_ML
+r_ML - 1.96 * se_r #nedre gräns
+r_ML + 1.96 * se_r #övre gräns
+
+#95%igt KI för mu_ML
+mu_ML - 1.96 * se_mu #nedre gräns
+mu_ML + 1.96 * se_mu #övre gräns
+
+```
+
+## Uppgift 2.7
+
+e\^(0.3893+57\*0.0149) ≈ 3.45 st läkarbesök. Det är en bra estimation då hon hade 3 stycken läkarbesök. residualen är därmed 3.45 - 3 = 0.45
+
+Uppgift 2.8
+
+```{r}
+install.packages("mvtnorm")
+library(mvtnorm)
+
+mean_vec <- c(r_ML, mu_ML) # Medelvärden för beta0 och beta1
+
+# Simulera 10 000 observationer från den bivariata normalfördelningen
+simulated_data <- rmvnorm(10000, mean = mean_vec, sigma = mle_cov)
+plot (x = simulated_data[ , 1], y = simulated_data[,2], col = 2)
+
+intervall <- simulated_data[simulated_data[,1] <= 0.5 & simulated_data[,1] >= 0.4 & simulated_data[,2] <= 0.009 & simulated_data[,2] >= 0.006, ]
+
+#Räkna ut sannolikheten att något finns i intervallen
+length(probability)/length(simulated_data)
+
+
+```

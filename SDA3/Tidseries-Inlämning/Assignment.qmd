@@ -1,0 +1,554 @@
+---
+title: "Assignment"
+author: 
+- Leo Wiberg
+- Minhui Zhong
+- Yimei Jiang
+date: last-modified
+format: 
+  html:
+    embed-resources: true
+    self-contained: true
+  pdf: default  
+  docx: default
+toc: true
+language: 
+  title-block-author-single: " "
+toc-title-document: "Innehåll"
+crossref-fig-title: "Figur"
+theme: Superhero
+title-block-banner-color: Primary
+title-block-published: "Publicerad"
+callout-warning-caption: "Varning"
+callout-note-caption: "Observera"
+callout-tip-caption: "Tips"
+editor: visual
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Step 0 Pick and prepare the data
+
+This file requires the following packages and data:
+
+```{r}
+#install.packages("mFilter")
+suppressMessages(library(mFilter))
+suppressMessages(library(tidyverse))
+suppressMessages(library(tseries))
+suppressMessages(library(forecast))
+suppressMessages(library(pxweb))
+suppressMessages(library(openxlsx))
+suppressMessages(library(readxl))
+suppressMessages(library(vars))
+suppressMessages(library(portes))
+```
+
+```{r}
+destfile = file.path(path.expand("~"), "datafile.xlsx")
+download.file("https://www.statistikdatabasen.scb.se/sq/149735", destfile, mode = "wb")
+index <- read_excel(destfile)
+names(index) = c("Månad", "Exportpris", "Importpris", "Producentpris", "InhemskTillgång")
+index = index[4:387,]
+
+destfile2 = file.path(path.expand("~"), "arbete.xlsx")
+download.file("https://www.statistikdatabasen.scb.se/sq/149746", destfile2, mode = "wb")
+arbete <- read_excel(destfile2)
+names(arbete) = c("Månad", "Arbetslöshet")
+arbete = arbete[3:254, ]
+arbete = ts(as.numeric(arbete$Arbetslöshet), 
+              start = c(2001, 1), 
+              end = c(2021, 12),
+              freq = 12)
+```
+
+We rename the variables for convenience and exclude the first 3 and the last 63 objects to adjust the data to the format.
+
+## Step 1 Describe the data
+
+We have selected our dataset from SCB website. Index is a data frame which contains 384 observations with 5 variables covering different aspects of economic growth. The dataset is monthly, covering data from 1990 January to 2021 December. The variable we’re interested in is Producentprisindex(PPI). We choose PPI as our main variable because it is a fundamental indicator of economics and can provide insights into the scale of economic development and total wealth. To work with time series, we convert the data frame into a ts. We removed the last 30 observations (from July 2019 to December 2021) for evaluating our predictions. 
+
+```{r}
+producentpris_ts = ts(as.numeric(index$Producentpris), start = c(1990, 1), end = c(2019, 6), freq = 12)
+producentpris_hela = ts(as.numeric(index$Producentpris), start = c(1990, 1), end = c(2021, 12), freq = 12)
+```
+
+We choose unemployment as our supporting variable. The dataset collects the unemployment rate from 2001 January to 2021 December. It is also monthly data. In Economics, theoretically, wages influences the price index in general, and unemployment influences the level of wages. Therefore we choose unemployment as our supporting variable. 
+
+```{r}
+plot(producentpris_hela)
+plot(arbete)
+```
+
+By looking at the plot, we can see a clear upward trend in PPI. This is a clear sign that our data is not stationary. However, we will still test for stationarity in step 3.
+
+For unemployment, there might be a slight trend but not very clear by eyesight. However, there is a clear cycle which can be very influential. 
+
+## Step 2 Exponential smoothing
+
+While we can’t see any seasonality, we’ll still allow R to calculate the seasonal component to eventually add some value to the model. We calculate a model:
+
+```{r}
+HWindex<-HoltWinters(producentpris_ts)
+plot(HWindex)
+HWindex
+```
+
+When given free range, the program includes some very small seasonal components as well as a small positive trend. In the plot, the HW-model looks to be similar with the real values but it’s always one step behind on the predictions, which is to be expected from a Holt-Winters model with a minimal trend and seasonal component. We then predict the last 30 observations with both an horizon of 1 and 12, as well as confidence intervals with \$\\alpha = 0.05\$. We chose not to use the function from the computer labs as it gave us a warning message. 
+
+```{r}
+predictions = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+upper1 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+lower1 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+
+for (i in 1:6){
+  predictdata = ts(as.numeric(index$Producentpris), start = c(1990, 1), end = c(2019, 5+i), freq = 12)
+  HWindex1 = HoltWinters(predictdata)
+  predictions[i] = predict(HWindex1)
+  upper1[i] = predict(HWindex1, prediction.interval = TRUE, level = 0.95)[2]
+  lower1[i] = predict(HWindex1, prediction.interval = TRUE, level = 0.95)[3]
+}
+predictdata = ts(as.numeric(index$Producentpris), start = c(1990, 2), end = c(2019, 12), freq = 12)
+HWindex1 = HoltWinters(predictdata)
+predictions[7] = predict(HWindex1)
+upper1[7] = predict(HWindex1, prediction.interval = TRUE, level = 0.95)[2]
+lower1[7] = predict(HWindex1, prediction.interval = TRUE, level = 0.95)[3]
+for (i in 8:30){
+  predictdata = ts(as.numeric(index$Producentpris), start = c(1990, 1), end = c(2019, 5+i), freq = 12)
+  HWindex1 = HoltWinters(predictdata)
+  predictions[i] = predict(HWindex1)
+  upper1[i] = predict(HWindex1, prediction.interval = TRUE, level = 0.95)[2]
+  lower1[i] = predict(HWindex1, prediction.interval = TRUE, level = 0.95)[3]
+}
+```
+
+For prediction 7 (and prediction 18 below) we remove the first observation from 1990 to slightly alter the training data. The reason we do this is that Rstudio otherwise gives us an “optimization failure” and the code stops working. Neither we, ChatGPT nor our handler knew why this happened. This is a workaround.
+
+```{r}
+predictions12 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+upper12 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+lower12 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+
+for (i in 1:17){
+  predictdata = ts(as.numeric(index$Producentpris), start = c(1990, 1), end = c(2018, 6+i), freq = 12)
+  HWindex12 = HoltWinters(predictdata)
+  predictions12[i] = predict(HWindex12, n.ahead = 12)[12]
+  upper12[i] = predict(HWindex12, n.ahead = 12, prediction.interval = TRUE, level = 0.95)[24]
+  lower12[i] = predict(HWindex12, n.ahead = 12, prediction.interval = TRUE, level = 0.95)[36]
+}
+predictdata = ts(as.numeric(index$Producentpris), start = c(1990, 2), end = c(2018, 24), freq = 12)
+HWindex12 = HoltWinters(predictdata)
+predictions12[18] = predict(HWindex12, n.ahead = 12)[12]
+upper12[18] = predict(HWindex12, n.ahead = 12, prediction.interval = TRUE, level = 0.95)[24]
+lower12[18] = predict(HWindex12, n.ahead = 12, prediction.interval = TRUE, level = 0.95)[36]
+for (i in 19:30){
+  predictdata = ts(as.numeric(index$Producentpris), start = c(1990, 1), end = c(2018, 6+i), freq = 12)
+  HWindex12 = HoltWinters(predictdata)
+  predictions12[i] = predict(HWindex12, n.ahead = 12)[12]
+  upper12[i] = predict(HWindex12, n.ahead = 12, prediction.interval = TRUE, level = 0.95)[24]
+  lower12[i] = predict(HWindex12, n.ahead = 12, prediction.interval = TRUE, level = 0.95)[36]
+}
+```
+
+For the plotting of the predictions, we zoom in on the last 4 years of the time series to see the predictions in more detail. 
+
+```{r}
+plot(producentpris_hela, xlim = c(2018, 2022), ylim = c(100,133))
+polygon(c(time(predictions), rev(time(predictions))), 
+        c(lower1, rev(upper1)), 
+        col = rgb(0.8, 0.1, 0.1, alpha = 0.3), border = NA)
+lines(predictions, col = c("red"), lwd = 2)
+abline(v=2019.5, lty = 2)
+plot(producentpris_hela, xlim = c(2018, 2022), ylim = c(100,133))
+polygon(c(time(predictions12), rev(time(predictions12))), 
+        c(lower12, rev(upper12)), 
+        col = rgb(0.1, 0.1, 0.8, alpha = 0.3), border = NA)
+lines(predictions12, col = c("blue"), lwd = 2)
+abline(v=2019.5, lty = 2)
+```
+
+As you can see, the predictions with a horizon of h = 1 (in red) are considerably closer to the real values than the predictions with h = 12 (in blue). The h = 1 predictions are still slightly delayed, which is to be expected from a Holt-Winters model with a minimal trend and seasonal component. The real trend is, however, mostly within the predicted intervals for 2019-2020. In 2021, the index grows abnormally, likely as a delayed result of the COVID-19 pandemic. The model isn’t well-suited to handle this unusual growth, and therefore the real values fall outside the confidence interval for most of the year.
+
+The h=12 model is even more off. The model always bases its predictions on data gathered until one year before the prediction and then assumes PPI will continue growing the same way for the rest of the year. It therefore doesn’t predict the slight dip in PPI in 2020 or the exponential growth in 2021, instead predicting that the PPI will grow slightly in 2020 like it did in 2019 and dip in 2021 like it did in 2020. Even with the increased confidence intervals due to uncertainty, the real values are rarely within the intervals, showing that this model likely doesn’t fit the data well. We can now calculate the $MAD_1={\sum_{t=1}^{30} |x_{t+1}- \hat x_{t+1|t}| \over 30}$, $MAD_{12}={\sum_{t=1}^{30} |x_{t+12}- \hat x_{t+12|t}| \over 30}$, $RMSE_1=\sqrt{\sum_{t=1}^{30} \epsilon_{t+1|t}^2 \over 30}$ and $RMSE_{12}=\sqrt{\sum_{t=1}^{30} \epsilon_{t+12|t}^2 \over 30}$
+
+For values from H = 1:
+
+```{r}
+HWerror = predictions[1:30]-producentpris_hela[355:384]
+HWRMSE = sqrt(mean(HWerror^2))
+HWMAD = mean(abs(HWerror))
+```
+
+H = 12:
+
+```{r}
+HWerror12 = predictions12[1:30]-producentpris_hela[355:384]
+HWRMSE12 = sqrt(mean(HWerror12^2))
+HWMAD = mean(abs(HWerror12))
+```
+
+We can now compare the RMSEs and MADs to the RMSEs and MADs of random walks:
+
+```{r}
+RWerror = producentpris_hela[354:383]- producentpris_hela[355:384]
+RWRMSE = sqrt(mean(RWerror^2))
+RWMAD = mean(abs(RWerror))
+RWRMSE
+RWMAD
+RWerror12 = producentpris_hela[343:372]- producentpris_hela[355:384]
+RWRMSE12 = sqrt(mean(RWerror12^2))
+RWMAD12 = mean(abs(RWerror12))
+RWRMSE12
+RWMAD12
+```
+
+We can see that the Holt Winters model with an \$h=1\$ is better than a random walk, but the Random walk is better than the Holt Winters for a horizon = 12. While we can’t be certain, we think that this is only because of the unstable economic situation that took place along with the pandemic. The growth was a bit more stable before 2020 and although an exponential smoother might not be the best fit for this data it likely would have worked better if the test data wasn’t from such a rocky economic time. To make sure that the changes are significant. We conduct a Diebold Mariano test on the differences with \$H_0\$: There’s no significant difference in the precision of the two models and \$H_1\$: There’s a significant difference in the precision of the two models with a significance level of 0.05:
+
+```{r}
+HWdiff1 = HWerror - RWerror
+HWDM = mean(HWdiff1)/sqrt(var(HWdiff1)/30)
+2 * (1 - pnorm(abs(HWDM)))
+
+HWdiff12 = HWerror12 - RWerror12
+HWDM12 = mean(HWdiff12)/sqrt(var(HWdiff12)/30)
+2 * (1 - pnorm(abs(HWDM12)))
+```
+
+We can reject \$H_0\$ in both tests, concluding that the Holt Winters model is in fact better than a random walk for H=1 but worse for H=12.
+
+## Step 3 - Stationarity
+
+We use an adf test to see the stationarity for both main and supporting variables with a significance level of 0.05.
+
+```{r}
+adf.test(producentpris_ts)
+adf.test(arbete)
+```
+
+The test results suggest that our data is not stationary. We need to transform our data before we can fit any model.
+
+We try differencing the data to achieve stationarity. 
+
+```{r}
+prod_1st_diff = diff(producentpris_ts, lag = 1)
+adf.test(prod_1st_diff)
+arbete_1st_diff = diff(arbete, lag = 1)
+adf.test(arbete_1st_diff)
+```
+
+The test suggests that we can reject the null hypothesis that the time series is not stationary. In other words, we have a stationary time series that we can work with. The 1st adf-test for arbete is however still too high. When plotting the data, we see that this is likely because of 2 outlier values following the COVID-19 pandemic. 
+
+```{r}
+plot(arbete_1st_diff)
+adf.test(arbete_1st_diff[1:240])
+```
+
+When removing the last 12 observations the adf-test shows stationarity. So, while arbete_1st_diff technically doesn’t pass the adf-test we’ll ignore it for now as this is only because of the two outliers. However, we need to see if there is seasonality in the data, especially in the main series producent_1st_diff. 
+
+```{r}
+acf(prod_1st_diff, xlab = "Year")
+plot(prod_1st_diff)
+```
+
+Both the trend and the seasonal pattern are gone. However, the series for PPI looks slightly heteroscedastic, with more variance in later years. The adf-test does however tell us that the heteroscedasticity is not significant enough to cause non-stationarity.
+
+## Step 4 ARMA
+
+We now fit an ARMA model.
+
+```{r}
+pacf(prod_1st_diff, xlab = "Year", ylab = "PACF")
+```
+
+The ACF plot from step 3 shows slight hints of autocorrelation in the first, second, and the sixth lag. However we believe that it is not strong enough to suggest an AR model. The PACF shows strong spikes on the first two lags, therefore we assume an MA(2) model will work best. We can either write this as an ARMA(0,2) for our stationary time series or as an ARIMA(0,1,2) model for our trending time series.
+
+```{r}
+arma_1 = arima(prod_1st_diff, order = c(0, 0, 2))
+arma_1
+
+```
+
+Or auto.arima() to fit an ARIMA model automatically from the untransformed data.
+
+```{r}
+arma_2 = auto.arima(producentpris_ts)
+arma_2
+
+```
+
+arma_2 returns the same result as arma_1 which uses transformed data. For the rest of the assignment we’ll just use the automatic model arma_2.  
+
+```{r}
+plot(producentpris_ts, type = "l") 
+lines(fitted(arma_2), type = "l", col = "red")
+```
+
+The data and fitted values fit well together.
+
+b\) Residual, autocorrelation, and normality
+
+```{r}
+acf(arma_2$residuals)
+Box.test(arma_2$residuals, lag = 1, type = c("Ljung-Box"))
+qqnorm(arma_2$residuals)
+qqline(arma_2$residuals, col = "red")
+```
+
+The autocorrelation graph of the residual does not show any significant spike. Furthermore, we can not reject the null hypothesis of independence by the Ljung-Box test. The line in the QQ plot is slightly less than 45-degree, but it is rather straight. We say that the fitted values are approximately normally distributed. Therefore we conclude that the ARMA(0, 2) or ARIMA(0, 1, 2) with drift fit the data quite well. \
+\
+c)Rolling forecast
+
+We predict the last 30 observations using the forecast() function with both an horizon of 1 and 12, with 95% confidence intervals.
+
+```{r}
+ARMApredictions = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+ARMAupper1 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+ARMAlower1 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+ARMApredictions12 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+ARMAupper12 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+ARMAlower12 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+
+for (i in 1:30){
+  predictdata = ts(as.numeric(index$Producentpris), start = c(1990, 1), end = c(2019, 5+i), freq = 12)
+  ARMAindex1 = auto.arima(predictdata)
+  ARMApredictions[i] = forecast(ARMAindex1)[[4]][1]
+  ARMAupper1[i] = forecast(ARMAindex1)[[6]][25]
+  ARMAlower1[i] = forecast(ARMAindex1)[[5]][25]
+  predictdata12 = ts(as.numeric(index$Producentpris), start = c(1990, 1), end = c(2018, 6+i), freq = 12)
+  ARMAindex12 = auto.arima(predictdata12)
+  ARMApredictions12[i] = forecast(ARMAindex12)[[4]][12]
+  ARMAupper12[i] = forecast(ARMAindex12)[[6]][37]
+  ARMAlower12[i] = forecast(ARMAindex12)[[5]][37]
+}
+
+```
+
+We plot the predictions together with the observed data
+
+```{r}
+plot(producentpris_hela, xlim = c(2018, 2022), ylim = c(100,133))
+polygon(c(time(ARMApredictions), rev(time(ARMApredictions))), 
+        c(ARMAlower1, rev(ARMAupper1)), 
+        col = rgb(0.8, 0.1, 0.1, alpha = 0.3), border = NA)
+lines(ARMApredictions, col = c("red"), lwd = 2)
+abline(v=2019.5, lty = 2)
+
+plot(producentpris_hela, xlim = c(2018, 2022), ylim = c(100,133))
+polygon(c(time(ARMApredictions12), rev(time(ARMApredictions12))), 
+        c(ARMAlower12, rev(ARMAupper12)), 
+        col = rgb(0.1, 0.1, 0.8, alpha = 0.3), border = NA)
+lines(ARMApredictions12, col = c("blue"), lwd = 2)
+abline(v=2019.5, lty = 2)
+```
+
+Predictions with horizon \$h=1\$ are similar to the real values, as it predicts only for the next period. The prediction captures the trend pretty well. It is only in the middle and the end of 2021 that the data are out of the prediction interval.
+
+Prediction with \$h=12\$ however is pretty off. We can see similar peaks and drops as in the training data. When predicting 12 months ahead, the accuracy drops. It does not capture the trend. Let's compare the RMSE and MAD to the ones of the random walk.
+
+```{r}
+ARIMAerror = ARMApredictions[1:30]-producentpris_hela[355:384]
+ARIMARMSE = sqrt(mean(ARIMAerror^2))
+ARIMAMAD = mean(abs(ARIMAerror))
+ARIMARMSE
+ARIMAMAD
+
+RWRMSE
+RWMAD
+
+ARIMAerror12 = ARMApredictions12[1:30]-producentpris_hela[355:384]
+ARIMARMSE12 = sqrt(mean(ARIMAerror12^2))
+ARIMAMAD12 = mean(abs(ARIMAerror12))
+ARIMARMSE12
+ARIMAMAD12
+
+RWRMSE12
+RWMAD12
+
+```
+
+From RMSE and MAD, we can say that the ARMA prediction with \$h=1\$ is better than random walk. On the other hand, when predicting 12 months ahead, random walk is slightly better than the ARMA prediction with \$h=12\$. To test if the differences are significant, we’ll use a Diebold Mariano-test:
+
+```{r}
+ARIMAdiff1 = ARIMAerror - RWerror
+ARIMADM = mean(ARIMAdiff1)/sqrt(var(ARIMAdiff1)/30)
+2 * (1 - pnorm(abs(ARIMADM)))
+
+ARIMAdiff12 = ARIMAerror12 - RWerror12
+ARIMADM12 = mean(ARIMAdiff12)/sqrt(var(ARIMAdiff12)/30)
+2 * (1 - pnorm(abs(ARIMADM12)))
+```
+
+The results show that both differences are significant.
+
+f\) Reflect and comment
+
+The purpose of the ARMA model is to forecast one month ahead of the Production Price Index (PPI), as well as one year ahead. The parameters  \$p=0\$ and \$q=2\$ are chosen based on the ACF and PACF.
+
+We check the data for stationarity using the Augmented Dickey-Fuller test. The time series turns out to be not stationary, therefore it is not suitable for modeling an ARMA model directly. We fit an ARMA using the processed data, that is to say, after order one differencing. Alternatively, we fit an ARIMA model with parameter \$p=0, d=1, q=2\$. 
+
+The residual of the fitted values of the model is examined using QQ plot and autocorrelation function. 
+
+The forecast of the model is examined using RMSE and MAD. The evaluation is as above in the RMSE and MAD part. 
+
+When forecasting the short term ahead into the future, our model captures the tendency quite well. However, when forecasting longer term ahead, such as one year ahead, the model is pretty off. We believe that it is due to the nature of the data that compared to seasonal factors, PPI is influenced more by domestic and international factors such as unemployment rate and raw materials world wide. It is hard to capture those factors that are exogeneous of the model. 
+
+### Step 5 - VAR
+
+We create a VAR model using our stationary time series. We then test for autocorrelation and normality by plotting acf, Ljungbox and QQ-plots. 
+
+```{r}
+VARmodell = VAR(cbind(prod_1st_diff[133:353], arbete_1st_diff[1:221]), lag.max =5, type ="both")
+
+acf(VARmodell$varresult$y1$residuals)
+acf(VARmodell$varresult$y2$residuals)
+
+
+portest(cbind(VARmodell$varresult$y1$residuals, VARmodell$varresult$y2$residuals),test ="LjungBox")
+
+qqnorm(VARmodell$varresult$y1$residuals)
+qqline(VARmodell$varresult$y1$residuals, col = "red")
+qqnorm(VARmodell$varresult$y2$residuals)
+qqline(VARmodell$varresult$y2$residuals, col = "red")
+
+```
+
+From the ACF diagram, we see that there is no autocorrelation in the residuals. The Ljung Box test suggests the same. The QQ plot suggests that the residual is normally distributed. 
+
+```{r}
+causality(VARmodell,cause ="y2")$Granger
+```
+
+Unfortunately, our supporting variable does not Granger cause the main variable. We fit the model anyway for the sake of the study. 
+
+```{r}
+#Impulse response function
+imp_response<-irf(VARmodell,n.ahead =12)
+plot(imp_response)
+```
+
+From the first plot above it looks like the response for y2 to a schock in y1 is zero. This
+
+is not the case (and should not be the case).
+
+d\) Rolling forecast
+
+```{r}
+PPI = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+PPIupper1 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+PPIlower1 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+PPI12 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+PPIupper12 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+PPIlower12 = ts(start = c(2019, 7), end = c(2019,7+29), freq = 12)
+
+for (i in 1:30) {
+  predictdata = ts(prod_1st_diff[1:(220 + i)], start = c(2001, 2), freq = 12)
+  predictarbete = ts(arbete_1st_diff[1:(220 + i)], start = c(2001, 2), freq = 12)
+  VAR_model = VAR(cbind(predictdata, predictarbete), lag.max = 5, type = "both")
+  predictdata12 = ts(prod_1st_diff[1:(220 + i-11)], start = c(2001, 2), freq = 12)
+  predictarbete12 = ts(arbete_1st_diff[1:(220 + i-11)], start = c(2001, 2), freq = 12)
+  VAR_model12 = VAR(cbind(predictdata12, predictarbete12), lag.max = 5, type = "both")
+  last_value = producentpris_hela[353+i]
+  PPI[i] = predict(VAR_model, n.ahead = 12)[[1]][[1]][1] + last_value
+  PPIupper1[i] = predict(VAR_model, n.ahead = 12)[[1]][[1]][25] + last_value
+  PPIlower1[i] = predict(VAR_model, n.ahead = 12)[[1]][[1]][13] + last_value
+  last_value12 = producentpris_hela[353+i-11]
+  PPI12[i] = sum(predict(VAR_model12, n.ahead = 12)[[1]][[1]][1:12]) + last_value12
+  PPIupper12[i] = sum(predict(VAR_model12, n.ahead = 12)[[1]][[1]][25:36]) + last_value12
+  PPIlower12[i] = sum(predict(VAR_model12, n.ahead = 12)[[1]][[1]][13:24]) + last_value12
+}
+
+plot(producentpris_hela, xlim = c(2018, 2022), ylim = c(100,133))
+polygon(c(time(PPI), rev(time(PPI))), 
+        c(PPIlower1, rev(PPIupper1)), 
+        col = rgb(0.1, 0.1, 0.8, alpha = 0.3), border = NA)
+lines(PPI, col = c("blue"), lwd = 2)
+abline(v=2019.5, lty = 2)
+
+plot(producentpris_hela, xlim = c(2018, 2022), ylim = c(97,133))
+polygon(c(time(PPI12), rev(time(PPI12))), 
+        c(PPIlower12, rev(PPIupper12)), 
+        col = rgb(0.1, 0.1, 0.8, alpha = 0.3), border = NA)
+lines(PPI12, col = c("blue"), lwd = 2)
+abline(v=2019.5, lty = 2)
+```
+
+Our predictions are close for h=1 but again further for h=12.
+
+Compare RMSE for the two horizons with predictions made by a random walk model
+
+```{r}
+#h = 1
+VARerror = PPI[1:30]-producentpris_hela[355:384]
+VARRMSE = sqrt(mean(VARerror^2))
+VARMAD = mean(abs(VARerror))
+VARRMSE
+VARMAD
+RWRMSE
+RWMAD
+
+#h = 12
+VARerror12 = PPI12[1:30]-producentpris_hela[355:384]
+VARRMSE12 = sqrt(mean(VARerror12^2))
+VARMAD12 = mean(abs(VARerror12))
+VARRMSE12
+VARMAD12
+RWRMSE12
+RWMAD12
+
+VARdiff1 = VARerror - RWerror
+VARDM = mean(VARdiff1)/sqrt(var(VARdiff1)/30)
+2 * (1 - pnorm(abs(VARDM)))
+
+VARdiff12 = VARerror12 - RWerror12
+VARDM12 = mean(VARdiff12)/sqrt(var(VARdiff12)/30)
+2 * (1 - pnorm(abs(VARDM12)))
+
+```
+
+#### How does a VAR model work for your data? Does it outperform the random walk? Comment on your results
+
+When predicting one step ahead, the VAR model fits the data better than a random walk. However, when predicting 12 steps ahead, random walk fits the data better than the VAR model.
+
+#### Compare VAR, ARMA, and the exponential smoothing model. Comment.
+
+```{r}
+#VAR h =1 
+VARRMSE
+VARMAD
+
+#ARMA h=1
+ARIMARMSE
+ARIMAMAD
+
+#exponential h=1
+HWRMSE
+HWMAD
+```
+
+When predicting the time series PPI one step ahead, ARMA model outperforms the other two. And the VAR model is better than the random walk. 
+
+```{r}
+VARRMSE12
+VARMAD12
+
+#ARMA h = 12
+RWRMSE12
+RWMAD12
+
+#exponential h = 12
+HWRMSE12
+HWMAD12
+```
+
+When predicting 12 steps ahead into the future,  again, ARMA outperforms the other two. And the next best is the VAR model. 
+
+In general, the ARMA model fits the data best in both scenarios \$h=1\$ and \$h=12\$. 
+
+We believe that there are two reasons for the fact that the VAR model is not the best fit. One is as mentioned before, there is a clear cycle in the unemployment rate data. Even though we tried differencing with order one which might remove the seasonal factor, but not the cyclic factor. The non-stationarity remains in the residual of the prediction. Secondly,  we used the Causality function to test the unemployment and PPI for the Grange cause. The test result shows that the supporting variable weakly Granger causes the main variable. This can be another reason that the VAR model is not the best fit compared to other models, because the supporting variable does not help the main variable to capture all the factors. 
+
+\
+\
+
+We can now calculate the $MAD_1={\sum_{t=1}^{30} |x_{t+1}- \hat x_{t+1|t}| \over 30}$, $MAD_{12}={\sum_{t=1}^{30} |x_{t+12}- \hat x_{t+12|t}| \over 30}$, $RMSE_1=\sqrt{\sum_{t=1}^{30} \epsilon_{t+1|t}^2 \over 30}$ and $RMSE_{12}=\sqrt{\sum_{t=1}^{30} \epsilon_{t+12|t}^2 \over 30}$

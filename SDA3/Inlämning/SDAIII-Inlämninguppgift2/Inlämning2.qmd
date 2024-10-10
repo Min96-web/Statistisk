@@ -1,0 +1,278 @@
+---
+title: "Statistik och dataanalys III, VT2024"
+subtitle: "Inlämningsuppgift 2"
+author: 
+- Leo Wiberg
+- Minhui Zhong
+- Yimei Jiang
+date: last-modified
+format: 
+  html:
+    embed-resources: true
+    self-contained: true
+  pdf: default  
+  docx: default
+toc: true
+language: 
+  title-block-author-single: " "
+toc-title-document: "Innehåll"
+crossref-fig-title: "Figur"
+theme: Superhero
+title-block-banner-color: Primary
+title-block-published: "Publicerad"
+callout-warning-caption: "Varning"
+callout-note-caption: "Observera"
+callout-tip-caption: "Tips"
+editor: visual
+---
+
+```{r}
+#| output: false
+# Den här inlämningsuppgiften förutsätter att följande paket finns installerade:
+#install.packages("optimStrat")
+library(optimStrat)
+#install.packages("latex2exp")
+library(latex2exp)#install.packages("plotly")
+library("plotly")
+
+```
+
+### Uppgift 1
+
+```{r}
+df = read.csv("Housing.csv")
+head(df)
+n = 300
+N = 2368
+y = df$CLOSING_PRICE
+set.seed(48)
+index = sample ( x = 1:N, size = n, replace = FALSE)
+ys = y[index] #mina urval
+
+tauhat_HT = sum(ys/(n/N))
+ybar= tauhat_HT/N
+s2 = var(ys)
+error_margin <- qt(1 - 0.025, n - 1) * sqrt(s2 / n * (1 - n/N))
+error_margin
+ci <- c(ybar - error_margin, ybar + error_margin)
+ci
+```
+
+Vi drar ett stickprov på 300 observationer av slutpris från databasen med hjälp av ett OSUuå. Vi skattar sedan genomsnittligt slutpris genom att använda Horvitz-Thompson estimatorn. Vi beräknar variansen av estimatorn samt ett 95%-igt konfidensintervall.
+
+$\hat\tau_{HT} = \sum_{k{\in}S} {y_k\over\pi_k} = {{\sum_{k{\in}S} y_k}\over{300\over2368}} = {1437475000\times2368\over300}≈11 346 469 333$
+
+$\bar{y}={\hat\tau_{HT}\over N}≈{11 346 469 333 \over 2368}≈4791583$
+
+$\hat {Var}( \bar y) = (1-{n \over N})\times {s^2_y \over n}=30 305 364 729$
+
+$KI = \bar y ± t^{n-1}_{\alpha /2} \times \sqrt{Var( \bar y)}≈ 4791583 ±1.96 \times \sqrt{30 305 364 729}≈ (4448998, 5134169)$
+
+Vi kommer fram till att stickprovet har ett medelvärde för slutpriset på ca 4.8 miljoner med ett 95%-igt konfidensintervall mellan 4.4 och 5.1 miljoner.
+
+### Uppgift 2
+
+```{r}
+cor_mat = cor(df[, -c(1,2,3,4,5,13)])
+cor_mat[,1]
+#hjälpvariabel AREA
+df_sorted = df[order(df$AREA),]
+
+x_st = df_sorted$AREA #hjälpvariabel
+y_st = df_sorted$CLOSING_PRICE #målvariabel
+h=4
+
+st = stratify(x = x_st, H = h) #veckto
+df_sorted$ST = st
+strat = optiallo(n = 300, x = x_st, stratum = st)
+tab = table(round(strat$nh))
+
+nh = as.numeric(names(tab))
+sum(nh) #Checka så att nh = 300 efter avrundning
+Nh = as.vector(tab)
+Weights = Nh/N
+
+my_list = split(y_st,st) 
+my_samp = list()
+for(i in 1:h){
+  my_samp[[i]] = sample(x = my_list[[i]], size = nh[i] )
+}
+
+Strat_mean = 0
+for(i in 1:h){
+  Strat_mean = Strat_mean + Weights[i]*mean(my_samp[[i]])
+}
+
+Strat_mean # Stratifierat medelvärde
+
+s2_h = sapply(my_samp,var)
+
+Strat_var = 0
+for(i in 1:h){
+  Strat_var = Strat_var + Weights[i]^2 * (1-nh[i]/Nh[i]) * s2_h[i]/nh[i]
+}
+Strat_var # Stratifierad varians
+
+error_margin <- qt(1 - 0.025, n - 1) * sqrt(Strat_var)
+error_margin
+
+ci <- c(Strat_mean - error_margin, Strat_mean + error_margin)
+ci# Stratifierad 95%-ig konfidensintervall för medelvärde
+```
+
+Vi använder cor() för att hitta hjälpvariabeln med högst korrelation med slutpriset. Vi kommer fram till att detta är AREA-variabeln. Vi sorterar sedan dataframen efter area och väljer att dela in dataframen i 6 st strata. Med hjälp av stratify-funktionen delar rStudio in dataframen och vi kan sedan med optiallo göra en optimal allokering av n = 300 stycken stickprov för att få en så bra representation av populationen som möjligt.
+
+Vi delar upp vår dataframe och skapar en lista my_samp som vi sedan fyller med slumpvald data baserat på vår stratifiering och allokering. Vi kan då beräkna medelvärde och varians genom att summera viktade medelvärden och varianser av alla enskilda strata.
+
+Formler vi använder för medelvärde och variansskattning: Vikter: $W_h = {N_h \over N}$ Medelvärdesskattning:$\bar Y_{str} = \sum^L_{h=1} W_h \bar Y_h$ Variansskattning: $\hat V(\bar Y_{str}) = \sum^L_{h=1} W^2_h(1-{n_h \over N_h})\times {s^2_h \over n_h}$
+
+### Uppgift 3
+
+```{r}
+#Skatta b_hat
+mean_ys = mean(ys)
+sd_ys = sd(ys)
+z_ys = (ys - mean_ys) / sd_ys
+
+x = df$AREA
+xs = x[index]
+
+mean_xs = mean(xs)
+sd_xs = sd(xs)
+z_xs = (xs - mean_xs) / sd_xs
+
+rs = sum(z_xs*z_ys) / (length(ys) - 1)
+
+b_hat = rs * (sd_ys / sd_xs)
+b_hat
+
+#Skatta det genomsnittliga slutpriset
+mean_reg = ybar + b_hat * (mean(df$AREA) - mean_xs)
+mean_reg
+
+# skattade reg varians
+v_mean_reg = (1 - length(ys) / length(df$CLOSING_PRICE)) * s2 / length(ys) * (1 - rs^2)
+v_mean_reg
+
+#95% konfidensinterval
+
+error_margin_reg <- qt(1 - 0.025, n - 1) * sqrt(v_mean_reg)
+error_margin_reg
+ci_reg <- c(mean_reg - error_margin_reg, mean_reg + error_margin_reg)
+ci_reg
+```
+
+Regressionsskattningen av det genomsnittliga slutpriset ges av funktionen: $\hat \mu_{reg}=\bar y + b(\mu_x-\bar x)$
+
+Enligt instruktion ska vi använder $\hat \beta = r \times {s_y \over s_x}$ att skatta $\hat \beta$. Dessutom kan man använder funktionen $z_x={x- \bar x \over s_x}$ och $r ={ \sum z_x z_y \over n-1}$ att skatta $r$.
+
+Funktionen för variansskattning: $\hat V (\hat \mu_{reg})=(1-{n \over N})\times {\sigma^2_y \over n} \times (1-\hat {Cor}(x,y)^2)$
+
+### Uppgift 4
+
+```{r}
+#För uppgift1
+ybarlist = c()
+varlist = c()
+for (i in 1:10000){
+  u4index = sample ( x = 1:N, size = n, replace = FALSE)
+  u4ys = y[u4index] #mina urval
+  ybarlist[i] = mean(u4ys)
+  varlist[i] = var(u4ys)/n*(1-n/N)
+}
+u4_df <- data.frame(ybars = ybarlist, sd = sqrt(varlist))
+
+  ggplot(u4_df, aes(x = ybars)) + 
+    geom_histogram(binwidth = 20000, fill = "cornflowerblue") +
+    theme_minimal() +
+    geom_vline(xintercept = mean(u4_df$ybars), color = "blue", size = 1) +  
+    geom_vline(xintercept = mean(df$CLOSING_PRICE), color = "red", linetype = "dashed", size = 1) +  
+    xlab("Estimerade Y-värden") +
+    ylab("Antal") #Den blåa linjen visar genomsnittligt medelvärde, den röda visar faktiskt medelvärde
+```
+
+```{r}
+#För uppgift 2
+u4_stratavg = c()
+u4_stratvar = c()
+for (q in 1:10000){
+  u4_samp = list()
+  Strat_mean = 0
+  for(i in 1:h){
+  u4_samp[[i]] = sample(x = my_list[[i]], size = nh[i])
+  Strat_mean = Strat_mean + Weights[i]*mean(u4_samp[[i]])
+}
+  u4_stratavg[q] = Strat_mean 
+  
+  s2_h = sapply(u4_samp,var)
+  Strat_var = 0
+  for(i in 1:h){
+    Strat_var = Strat_var + Weights[i]^2 * (1-nh[i]/Nh[i]) * s2_h[i]/nh[i]
+  }
+  u4_stratvar[q] = Strat_var
+}
+
+u4_df2 <- data.frame(ybars = u4_stratavg, var = u4_stratvar, sd = sqrt(u4_stratvar))
+  
+  ggplot(u4_df2, aes(x = ybars)) + 
+    geom_histogram(binwidth = 20000, fill = "cornflowerblue") +
+    theme_minimal() +
+    geom_vline(xintercept = mean(u4_df2$ybars), color = "blue", size = 1) +  
+    geom_vline(xintercept = mean(df$CLOSING_PRICE), color = "red", linetype = "dashed", size = 1) +  
+    xlab("Stratifierat OSUuå Y-värden") +
+    ylab("Antal") 
+```
+
+```{r}
+#För uppgift 3
+reglist = c()
+regvarlist = c()
+for (q in 1:10000){
+  index = sample ( x = 1:N, size = n, replace = FALSE)
+  #Skatta b_hat
+  mean_ys = mean(df$CLOSING_PRICE[index])
+  sd_ys = sd(df$CLOSING_PRICE[index])
+  z_ys = (df$CLOSING_PRICE[index] - mean_ys) / sd_ys
+  mean_xs = mean(df$AREA[index])
+  sd_xs = sd(df$AREA[index])
+  z_xs = (df$AREA[index] - mean_xs) / sd_xs
+  rs = sum(z_xs*z_ys) / 299
+  b_hat = rs * (sd_ys / sd_xs)
+  
+  #Skatta det genomsnittliga slutpriset
+  mean_reg = mean_ys + b_hat * (mean(df$AREA) - mean_xs)
+  reglist[q] = mean_reg
+  
+  # skattade reg varians
+  v_mean_reg = (1 - length(ys) / length(df$CLOSING_PRICE)) * s2 / length(ys) * (1 - rs^2)
+  regvarlist[q] = v_mean_reg
+}
+
+  u4_df3 <- data.frame(ybars = reglist, var = regvarlist, sd = sqrt(regvarlist))
+  
+  ggplot(u4_df3, aes(x = ybars)) + 
+    geom_histogram(binwidth = 20000, fill = "cornflowerblue") +
+    theme_minimal() +
+    geom_vline(xintercept = mean(u4_df3$ybars), color = "blue", size = 1) +  
+    geom_vline(xintercept = mean(df$CLOSING_PRICE), color = "red", linetype = "dashed", size = 1) +  
+    xlab("Regressionsestimation Y-värden") +
+    ylab("Antal")
+  mean(df$CLOSING_PRICE) - mean(u4_df$ybars) # "Bias" OSUuå
+  mean(u4_df$sd)
+
+  mean(df$CLOSING_PRICE) - mean(u4_df2$ybars) #"Bias" Stratifierat
+  mean(u4_df2$sd)
+
+  mean(df$CLOSING_PRICE) - mean(u4_df3$ybars) # Bias Regressionsanalys
+  mean(u4_df3$sd)
+```
+
+Alla tre varianter är i princip väntevärdesriktiga. I teorin vet vi att regressionsestimatorn har en väldigt liten bias, men vid 10 000 simulationer kan denna bias inte urskiljas från annars slumpmässiga variationer. Vanligt OSUuå är klart sämst med högst varians och “bias”. Stratifierat OSUuå har både lägst varians och lägst “bias” (Varken stratifierat eller vanligt OSUuå har ingen riktig bias: skillnaden mellan simuleringens medelvärde och det faktiska medelvärdet beror på slumpen)(Detta gällde de gångerna vi simulerade 1.4. Det är dock möjligt att simuleringarna ovan skiljer sig från texten då de är slumpmässiga.)
+
+Vi föredrar stratifierat urval då det dels ser ut att ha minst varians, och dels då det inte kräver att vi vet populationsparametrar i förväg. 
+
+### Uppgift 5
+
+Klusterurval och stratifierat urval skiljer sig i hur de väljer stickprov från populationen. Populationen delas in i grupper eller kluster i klusterurval och väljs ett antal kluster slumpmässigt för att undersöka alla enheter  medan  populationen delas in i strata i stratifierat urval och väljs ett slumpmässigt urval från stratum för att undersöka undersökningen. Som nämnde tidigare har vi valt med hjälpvariabel LATITUDE för att skatta det genomsnittliga slutpriset om vi hade använt oss av klusterurval. Eftersom hjälpvariabel LATITUDE har lägre positiv korrelation med undersökningsvariabler och kluster som vi valde borde vara en bra representation av populationen. I det här fallet hade vi fungerat klusterurval är en bra urvalsmetod eftersom om vi har kluster LATITUDE som relaterat till slutpriset på datainsamling då blir mer kostnadseffektivt att få reda på slutpriser i olika områden.
+
+\

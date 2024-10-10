@@ -1,0 +1,228 @@
+---
+title: "Inlämning GLM VT2024"
+author: "Minhui Zhong"
+date: "2024-04-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Inlämningsuppgift
+
+> Inkludera en kortfattad lekmanna sammanfattning av dina analyser här.
+
+## Uppgift 1: Regression för binära data
+```{r, echo=FALSE}
+# All kod i kodblock - om koden ej skall synas i html eller pdf, använd e.g. echo=FALSE
+load(url("https://raw.githubusercontent.com/johankoskinen/ST2201/main/data/GlasgowData.RData"))
+```
+### Deskription
+
+Tabeller, sammanfattningsmått, och plottar som beskriver era variabler och associationer
+
+```{r}
+# t.ex.
+View(Glasgow)
+```
+
+
+```{r}
+GlasgowNoNaNs <- na.omit(Glasgow)
+
+for (i in 1:nrow(Glasgow)) {
+  if (is.na(Glasgow[i, 8])) {
+    Glasgow[i, 8] <- 1.7613}}
+Glasgow <- na.omit(Glasgow)
+
+modell1 <- glm(Drugs ~ ., data = Glasgow, family = "binomial")
+modell2 <- glm(Drugs ~ ., data = GlasgowNoNaNs, family = "binomial")
+
+logit <- step(modell1)
+logitNoNaNs <- step(modell2)
+summary(logit)
+summary(logitNoNaNs)
+
+
+# Fit the logit model
+logit_model <- glm(
+  Drugs ~ Money + Romantic + FamSmoke + Alcohol + Smoke + Female + Popularity, 
+  data = Glasgow, 
+  family = binomial(link = "logit")
+)
+
+# Get the summary of the logit model
+summary(logit_model)
+predprob <- logitNoNaNs$fitted.values
+GlasgowNoNaNs$predicted_No_NaNs<-ifelse(predprob < 0.5, 0, 1)
+prop.table(xtabs(~Drugs + predicted_No_NaNs, GlasgowNoNaNs), margin = 1)
+
+predprob <- logit$fitted.values
+Glasgow$predicted<-ifelse(predprob < 0.5, 0, 1)
+prop.table(xtabs(~Drugs + predicted, Glasgow), margin = 1)
+
+```
+```{r}
+summary(logit)
+summary(logitNoNaNs)
+
+```
+
+```{r}
+mod1_p <- glm(Drugs ~ Alcohol, data = Glasgow, family = binomial(link = "probit"))
+summary(mod1_p)
+
+ my_da<- data.frame(
+  Logit_P = logit_coefficients[, 4],  # P-values for logit model
+  Probit_P = probit_coefficients[, 4],  # P-values for probit model
+  row.names = rownames(logit_coefficients)
+)
+my_da
+
+x <- 1:5
+probit_prop<-pnorm(-2.4727 + 0.6581*x)
+observed_prop = c()
+for (i in 1:5) { observed_prop[i] = sum(Glasgow$Drugs * Glasgow$Alcohol == i)/sum(Glasgow$Alcohol == i)}
+
+dataset = data.frame(
+  proportion =c(probit_prop, observed_prop),
+  Alkoholnivå =c(1:5),legend =rep(c("probit-andel","observerade andelar"), c(5,5)))
+library(tidyverse)
+ggplot(
+  dataset,aes(x =Alkoholnivå,y =proportion,col =legend))+
+  geom_line()+
+  theme_classic()
+```
+
+## Analyser
+
+Dina analyser här
+
+Om ni känner att ni behöver förklara något med formler, använd $\LaTeX$, antingen in-line $\eta_i = \beta_0+\beta_1 x_i$, eller 'displayed', t.ex.
+$$
+\eta_i = \beta_0+\beta_1 x_i
+$$
+Eftersom ni har lite erfarenhet i LaTex, skulle jag använda editorn <https://latex.codecogs.com/eqneditor/editor.php>, där man använder knapparna för att generera *the code* som man kan klistra in här, med dollar signs (eller double dollar signs för displayed, som ovan).
+
+
+
+## Tolkningar av resultat
+
+Dina tolkningar här
+
+## Task 2: Regression för räknedata
+
+```{r}
+load(url("https://raw.githubusercontent.com/johankoskinen/ST2201/main/data/MurderData.RData"))
+```
+
+### Deskription och variabelbeskrivnign
+
+Beskriv och motivera variabler
+# Vi vet att log𝜇 = 𝛽0 i poisson regression då vi måste ta anti-loggen e^2.066 =  för att få ut medelvärdet av den faktiska datamängden.
+```{r}
+library(faraway)
+library(tidyverse)
+library(ggplot2)
+View(MurderData)
+plot(MurderData$Murders)
+
+summary(MurderData)
+table(round(MurderData$Murders/50)*50)
+
+hist(log(MurderData$Murders + 1))
+
+MurderDataNoNames = MurderData[, 1:8]
+round(cor(MurderDataNoNames), 3)
+
+mod_1 <- glm(Murders ~ . - State - County, data = MurderData, family = "poisson")
+summary(mod_1)
+
+set.seed(1050)
+k = 100
+tryobservsPois = sample(1:3085, k)
+trydataPois = data.frame()
+for (i in 1:k) { for (j in 1:length(MurderData)) { trydataPois[i,j] = MurderData[tryobservsPois[i], j]}}
+names(trydataPois) = names (MurderData)
+
+
+trydataPois$predicted = predict(mod_1, type = "response", newdata = trydataPois)
+
+plot(predicted ~ Murders, data = trydataPois)
+
+trydataPois$Residualer = trydataPois$Murders - trydataPois$predicted
+
+plot(Residualer ~ Murders, data = trydataPois)
+
+# Enklare Poisson-modell utan MasonDixon
+mod_2 <- glm(Murders ~ . - State - County - MasonDixon, data = MurderData, family = "poisson")
+summary(mod_2)
+
+# Deviance-test mellan mod_1 och mod_2
+deviance_test <- anova(mod_2, mod_1, test = "Chisq")
+
+# Visa resultatet av deviance-testet
+deviance_test
+
+
+exp(-0.0306)
+confint(mod_1)
+deviance(mod_1)
+
+install.packages("Mass")
+library(MASS)
+mod_nb = glm(Murders ~ . - State - County, data = MurderData, family = negative.binomial(1))
+mod_nb
+
+mod_nb2 = glm.nb(formula = Murders ~ . - State - County, data = MurderData)
+mod_nb2
+
+plot(fitted(mod_nb2), fitted(mod_nb))
+anova(mod_nb, mod_2, test = "Chisq")
+
+
+```
+
+```{r}
+mod_nb_simple = glm(Murders ~ . - State - County -Unemployment - MasonDixon - percPovery - inequality, data = MurderData)
+
+test_lrt = 2 * (mod_nb_simple$loglik - mod_nb$loglik)
+
+df = length(coef(mod_nb)) - length(coef(mod_nb_simple))
+
+p_value = 1 - pchisq(test_lrt, df)
+p_value
+
+install.packages("pscl")
+library(pscl)
+mod_nb_hurdle = hurdle(Murders ~ . - State - County, data = MurderData)
+summary(mod_nb_hurdle)
+
+AIC(mod_nb)
+AIC(mod_nb_hurdle)
+
+summary(mod_nb)
+
+coef(mod_2)
+
+summary(MurderData$Murders)
+summary(predict(mod_2,  type = "response"))
+summary(predict(mod_nb, type = "response"))
+
+```
+
+Avvikelsen är 120800 och frihetsgraderna är 3084 vilket indikerar att vår modell inte passar in i data väl.
+
+## Analyser
+
+Dina analyser här
+
+## Tolkningar av resultat
+
+Dina tolkningar här
+
+
+
+
+

@@ -1,0 +1,176 @@
+---
+title: "Laboration 5"
+author: "Minhui"
+format: html
+editor: visual
+---
+
+```{r}
+#| output: false
+#install.packages("optimStrat")
+library(optimStrat)
+
+```
+
+```{r}
+#fråga 1 
+df = read.csv("agpop.csv")
+head(df)
+N= nrow(df)
+n = 300
+y = df$acres92
+set.seed(48)
+sample(1:5, size = 1, replace = F)
+
+head(sample)
+set.seed(48)
+index = sample ( x = 1:N, size = n, replace = FALSE)
+index # skriver inte ut på rapporten
+ys = y[index] #mina urval
+ybar_srs=mean(ys)
+tauhat_srs = N * ybar_srs # total skattning
+s2 = var(ys)
+error_margin <- qt(1 - 0.025, n - 1) * sqrt(s2 / n * (1 - n/N))
+error_margin
+ci <- c(ybar_srs - error_margin, ybar_srs + error_margin)
+ci
+
+cor_mat = cor(df[, -c(1,2,15)])
+cor_mat[,1]
+#hjälpvariabel acres 87
+hist(df$acres87)
+df_sorted = df[order(df$acres87),]
+df_sorted
+
+x_st = df_sorted$acres87 #hjälpvariabel
+y_st = df_sorted$acres92 #målvariabel
+h=8
+st = stratify(x = x_st, H = h) #veckto
+table(st)
+df_sorted$ST = st
+strat = optiallo(n = 300, x = x_st, stratum = st)
+tab = table(strat$nh)
+
+Nh = as.vector(table(strat$stratum))
+nh = names(tab) # lilla nh dra urval från observationer
+nh = as.numeric(nh)
+nh = round(nh)
+sum(nh)
+
+nh[8] = nh[8]-1 # så att det summerar till 300
+nh[8]
+nh
+Nh = as.vector(tab)
+Nh
+
+df_list = split(y_st,st) # my_strata = split(df_sorted$acres92, st)
+sample_from_ST_h = sample(df_list[[1]], size = nh[1])
+mean(sample_from_ST_h)
+
+list_samp = list()
+for(i in 1:8){
+  y_st = df_list[[i]]
+  samp = sample(x = y_st, size = nh[i] )
+  list_samp[[i]] = samp
+}
+ybar_h = sapply(list_samp,mean)
+ybar_h
+s2_h = sapply(list_samp,var)
+s2_h
+
+```
+
+```{r}
+cor_mat = cor(df[, -c(1,2,3,4,5,13)])
+cor_mat[,1]
+#hjälpvariabel AREA
+hist(df$AREA)
+df_sorted = df[order(df$AREA),]
+df_sorted
+x_st = df_sorted$AREA #hjälpvariabel
+y_st = df_sorted$CLOSING_PRICE #målvariabel
+h=6
+st = stratify(x = x_st, H = h) #veckto
+table(st)
+df_sorted$ST = st
+strat = optiallo(n = 300, x = x_st, stratum = st)
+tab = table(strat$nh)
+
+Nh = as.vector(table(strat$stratum))
+nh = names(tab) # lilla nh dra urval från observationer
+nh = as.numeric(nh)
+nh = round(nh)
+sum(nh)
+
+Nh = as.vector(tab)
+Nh
+
+my_list = split(y_st,st) # my_list = split(df_sorted$CLOSING_PRICE, st)
+sample_from_ST_h = sample(my_list[[1]], size = nh[1])
+mean(sample_from_ST_h)
+
+my_samp = list()
+for(i in 1:6){
+  y_st = my_list[[i]]
+  samp = sample(x = y_st, size = nh[i] )
+  my_samp[[i]] = samp
+}
+ybar_h = sapply(my_samp,mean)
+ybar_h
+s2_h = sapply(my_samp,var)
+s2_h
+
+error_margin <- qt(1 - 0.025, n - 1) * sqrt(s2_h / n * (1 - n/N))
+error_margin
+
+ci <- c(ybar_h - error_margin, ybar_h + error_margin)
+ci
+
+cor_mat = cor(df[, -c(1,2,3,4,5,13)])
+cor_mat[,1]
+#hjälpvariabel AREA
+df_sorted = df[order(df$AREA),]
+x_st = df_sorted$AREA #hjälpvariabel
+y_st = df_sorted$CLOSING_PRICE #målvariabel
+h=4
+st = stratify(x = x_st, H = h) #vecktor
+table(st)
+df_sorted$ST = st
+strat = optiallo(n = 300, x = x_st, stratum = st)
+tab = table(strat$nh)
+
+nh = names(tab) # lilla nh dra urval från observationer
+nh = as.numeric(nh)
+nh = round(nh)
+sum(nh) #Checka så att nh = 300 efter avrundning
+
+my_list = split(y_st,st) 
+my_samp = list()
+for(i in 1:4){
+  my_samp[[i]] = sample(x = my_list[[i]], size = nh[i] )
+}
+
+ybar_h = sapply(my_samp,mean)
+Nh = as.vector(tab)
+Weights = Nh/N
+
+Strat_mean = 0
+for(i in 1:4){
+  Strat_mean = Strat_mean + Weights[i]*ybar_h[i]
+}
+Strat_mean # Stratifierat medelvärde
+
+s2_h = sapply(my_samp,var)
+Strat_var = 0
+for(i in 1:4){
+  Strat_var = Strat_var + Weights[i]^2 * (1-nh[i]/Nh[i]) * s2_h[i]/nh[i]
+}
+Strat_var # Stratifierad varians
+
+error_margin <- qt(1 - 0.025, n - 1) * sqrt(Strat_var)
+error_margin
+
+ci <- c(Strat_mean - error_margin, Strat_mean + error_margin)
+ci# Stratifierad 95%-ig konfidensintervall för medelvärde
+
+```

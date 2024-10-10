@@ -1,0 +1,154 @@
+---
+title: "Marking guide assignment GLM"
+author: "Johan Koskinen"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+The assignment should 
+- be carried out in groups of 2 to 3 students, with
+- each group submitting one report May 2nd
+- be written in the form of a report
+- be written in RMarkdown (starting with the template on Athena)
+- be written in Swedish or English
+
+## Tasks
+
+The assignment consists of two tasks
+
+1. The analysis of drug habits of some Scottish kids
+2. The analysis of the number of murders in the US
+
+## Format
+
+All `R`-code and text should be available in the RMarkdown .Rmd document that you submit - no separate document should be submitted. Make sure that all your code actually works so that Yulia simply can replicate your analysis.
+
+> The report should have a plain language summary (abstract) at the start that clearly and plainly explains what you have done and what you have concluded. 
+
+## Analys
+For a PASS mark, both of your analyses need to covere the following aspects
+
+a. Description: Describe your data, the variables, and associations, using metrics, tables, and figures
+b. Data analysis: Try different link functions, transformations, evaluations of your models, etc
+c. Interpretation: You need to interpret your results and attempt to explain what they mean in plain language
+d. Critical reflection: In apprasing your work, great emphasis is put on your ability to critically reflect on what, if any, assumptions are violated or not. You are encouraged to speculate regarding what the consequenses might be of any violations and how these might affect your conclusions.
+
+# Task 1
+
+Download the dataset
+
+```{r}
+load(url("https://raw.githubusercontent.com/johankoskinen/ST2201/main/data/GlasgowData.RData"))
+```
+
+This contains a data-frame called `Glasgow` with data for a number of 14-16-year-olds in Glasgow in January 1997, from the *Teenage Friends and Lifestyle Study* (see, e.g.  Michell, L., and P. West, 1996, "Peer pressure to smoke: the meaning depends on the method," Health Education Research, 11(1), 39-49). The data are re-coded and re-formated and are based on the third wave of data. More information may be found at <https://www.stats.ox.ac.uk/~snijders/siena/Glasgow_data.htm>.
+
+## Drugs
+
+Each pupil has been asked to provide the frequency with which they use one of 15 types of drugs. Cannabis and Hash is the most common drug and while many who use Cannabis and Hash also use other drugs, some students exclusively use another drug. A summary of the orginal drug use is provided in the Table:
+
+
+| Frequency   | Cannabis or Hash only |   Cannabis, Hash, and other Class A drug |
+|:----------|:------------:|:------------:|
+Never |    59 |   1 |
+Tried once | 25  |  3 |
+Occasional use |  21  | 16 |
+Regular use |   6  |  5 |
+
+Other class A drugs included Ecstacy (6 occasional, 4 regular), Acid or LSD (19 occasional, 3 regular), Amphetamines (11 occasional, 6 regular), and Heroin (1 occasional, 1 regular).
+
+## Outcome variable
+
+We construct the outcome variable of interest, `Drugs`, as an indicator of whether a pupil occasionally or frequently uses Cannabis, Hash, or other Class A drugs. 
+
+## Possible predictors
+
+The variables in the `Glasgow` dataset consists of
+
+| Variable   | Definition               |
+|:----------|:------------|
+|    Drugs   | Occasional or regular use of Cannabis or Class A drug |
+|    Money   | how much pocket money the student had per moth, in British pounds   |
+|    Romantic | indicates whether the student had a romantic relation   |
+|    FamSmoke   | if family smokes   |
+|    Alcohol   | Alcohol consumption is coded as follows: 1 (non), 2 (once or twice a year), 3 (once a month), 4 (once a week) and 5 (more than once a week) |
+|   Smoke   | 1 (non), 2 (occasional) and 3 (regular, i.e. more than once per week) |
+|   Female   | 0 (Male), 1 (Female) |
+|  Popularity | Number of student that have nominated individuals as their best friend |
+|   ComicsBooks   | I read comics, magazines, or books |
+|   SportWatch   | I go to sports mathces |
+|   SportsDo   | I take part in sports |
+|   Gaming   | I play computer games |
+|   Hobby   | I spend time on my hobby (e.g. art, and instrument) |
+|   Scouts   | I go to somethink like the scouts |
+|   ChurchMosqueTemple  | I go to Church, the Mosque, or the Temple |
+
+
+For activities - "I read...", "I go...", etc - the frequencies are recorded as
+
+| 1 |  2 |  3 |  4 |
+|:----------:|:------:|:------:|:------:|
+|     most days     |once a week |   once a month   |   less often or never     |
+
+
+## Instructions
+
+Estimate models explaining `Drugs`, using a choice of covariates.
+
+-   Use at least two different link functions
+-   Select and motivate a selection of predictors 
+-   Interpret and test your regression coefficients
+  
+
+### Specific questions
+
+Use a model selection criteria for motivating a model. Discuss how much you would rely on the conclusions with reference to, for example, a goodness-of-fit measure (or test). 
+
+Are there effects of predictors that differ for boys and girls
+
+Is there an assumption (or several) of the model that is at risk of being violated given that all the pupils are in the same school? (Hint: does it matter if your best friend does drugs or not?). Discuss!
+
+# Task 2
+
+## Download the dataset
+
+```{r}
+load(url("https://raw.githubusercontent.com/johankoskinen/ST2201/main/data/MurderData.RData"))
+```
+
+This is data on the number of murders in the USA in 1990 on the level of the County. 
+
+| Variable   | Definition               |
+|:----------|:------------|
+Murders | number of murders committed |
+Unemployment | unemployment rate |
+MasonDixon | an indicator of whether the state of the county is in the South of the US |
+logPopdensity | log of population density |
+medHHincome | log of median family income |
+percPovery | percent of families living below poverty line |
+percBlack | percent of black residents |
+inequality | Gini index of family income inequality |
+State | name of the state county is in |
+County | name of county |
+
+## Instructions
+
+Estimate models explaining `Murders`, using a choice of covariates.
+- Use at least two different link functions
+- Select and motivate a selection of predictors 
+- Interpret and test your regression coefficients
+  
+### Specific questions
+
+Use a model selection criteria for motivating a model. Discuss how much you would rely on the conclusions with reference to, for example, a goodness-of-fit measure (or test).
+
+Can you find examples of reversals of signs of coefficients, called among other things Simpson's Paradox, Lord's Paradox and Suppression Effects?
+
+Is there a assumption of the model that is at risk of being violated given that counties are spatially embedded and grouped in states? (Hint: does it matter if the neighbouring county has a high murder rate or not?). Discuss!
+
