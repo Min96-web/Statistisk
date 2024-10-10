@@ -1,0 +1,570 @@
+---
+title: "Statistik och dataanalys I, 15 hp "
+subtitle: "Inlamningsuppgift 1"
+author: 
+- Namn Minhui Zhong
+- Namn Johanna Selö
+date: last-modified
+format: 
+  html:
+    self-contained: true
+  pdf: default  
+  docx: default
+toc: true
+language: 
+  title-block-author-single: " "
+toc-title-document: "Innehåll"
+crossref-fig-title: "Figur"
+theme: lumen
+title-block-banner-color: Primary
+title-block-published: "Publicerad"
+callout-warning-caption: "Varning"
+callout-note-caption: "Observera"
+callout-tip-caption: "Tips"
+editor: visual
+---
+
+::: callout-warning
+Den här inlämningsuppgiften förutsätter att följande paket finns installerade:
+
+-   `mosaic`
+
+-   `dplyr`
+
+-   `geosphere`
+
+-   `leaflet`
+
+Paket kan installeras via kommandot `install.packages('packagename')`, där `'packagename'` är namnet på paketet, t.ex `'mosaic'`.
+:::
+
+## Introduktion
+
+I den första inlämningsuppgiften ska ni självständigt i grupper om tre analysera ett dataset i programmeringsspråket R. Till skillnad från datorlaborationerna finns det minimalt med kodexempel. Datorlaborationerna går igenom de flesta momenten som behandlas i inlämningsuppgiften, så se till att göra klart dessa innan.
+
+------------------------------------------------------------------------
+
+::: callout-note
+### Instruktioner
+
+I denna inlämningsuppgift ska ni analysera ett datamaterial som beskriver ca 500 distrikt i Boston år 1970. Datasetet är en modifierad version[^1] av originaldata[^2] som användes i en studie[^3] där författarna predikterade medianhuspriser i olika distrikt med hjälp av en rad förklaringsvariabler.
+
+Följande variabler finns i datasetet `boston_census_data.Rdata` ([ladda ner](https://github.com/StatisticsSU/SDA1/blob/main/assignments/assignment1/Boston_census_data.RData?raw=true)), som innehåller 480 observationer. Notera att en observation motsvarar ett distrikt:
+
+-   `town`: Stadsdel.
+-   `longitude`: Longitud koordinat.
+-   `latitude`: Latitud koordinat.
+-   `median_home_value`: Medianhuspriset (enhet 1K USD).
+-   `crime_rate`: Brott (per 1000 invånare).
+-   `zoned_25k_p`: Andel av stadsdelens bostadsmark ämnad för marklotter större än 25000 kvadratfot.
+-   `indust_p`: Andel tunnland ägd av företag utanför detaljhandel.
+-   `borders_charles`: Charles River dummy variabel (= 1 om området gränsar till floden, 0 annars).
+-   `NOx`: Koncentration av kväveoxider (andelar per 10 miljon).
+-   `n_rooms_avg`: Genomsnitt antal rum i ägda bostäder.
+-   `before_1940_p`: Andel ägda bostäder byggda före 1940.
+-   `employ_dist`: Viktat avstånd till fem arbetsförmedlingscentra i Boston.
+-   `radial_access`: Index som mäter tillgång till stadsmotorvägar.
+-   `tax_rate`: Fastighetsskatt per 10000 USD.
+-   `pupil_teacher_ratio`: Lärartäthet mätt som elev per lärare.
+-   `lower_stat_pct`: Procentandel med låg socioekonomisk status i termer av utbildning eller arbete.
+-   `dist_fenway_park`: Avstånd till stadion Fenway Park.
+
+Inlämningsuppgiften ska lämnas in i form av ett html-dokument genererat av Quarto. **Kontrollera att ni inte får några felmeddelande när du genererar HTML-dokumentet. Läs sedan igenom HTML-dokumentet noggrant innan ni lämnar in det.** Använd tydliga figurer och namnge axlarna med tydliga variabelnamn. Glöm inte att skriva era namn i början av dokumentet, där det nu står Namn 1, Namn 2 och Namn 3.
+:::
+
+[^1]: Totalundersökningen trunkerade medianhusvärdet till 50K för de censusdistrikten som låg över. Vi har tagit bort dessa censusdistrikt. Vi har också tagit bort variabler som är irrelevanta.
+
+[^2]: Harrison Jr, D., & Rubinfeld, D. L. (1978). Hedonic housing prices and the demand for clean air. Journal of Environmental Economics and Management, 5(1), 81-102.
+
+[^3]: Pace, R. K., & Gilley, O. W. (1997). Using the spatial configuration of the data to improve estimation. The Journal of Real Estate Finance and Economics, 14(3), 333-340.
+
+## 0. Ladda in data
+
+#### 💪 Uppgift 0.1
+
+Ladda in datasetet `Boston_census_data` med följande kod.
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 0.1 - Svar
+
+```{r}
+load(file = url("https://github.com/StatisticsSU/SDA1/blob/main/assignments/assignment1/Boston_census_data.RData?raw=true")) 
+Boston_census <- Boston_census_data
+Boston_census
+```
+:::
+
+```{r}
+suppressMessages(library(geosphere))
+suppressMessages(library(leaflet))
+```
+
+## 1. Kriminalitet i Boston
+
+I detta avsnitt ska ni analysera kriminaliteten i Boston med hjälp av variabeln `crime_rate`.
+
+#### 💪 Uppgift 1.1
+
+Vad kan man generellt säga om kriminaliteten i Boston 1970? Använd lämpliga figurer och mått för att ge en beskrivning.
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 1.1 - Svar
+
+<div>
+
+Skriv svaret här. Vid behov skrivs matematiska symboler inom dollartecken, till exempel $\overline{y} = \cfrac{\sum^{n}_{i=1} y_i}{n}$. Koden skrivs i R-rutan nedanför.
+
+</div>
+
+```{r}
+suppressMessages(library(mosaic))
+favstats(~crime_rate, data = Boston_census)
+bwplot(~crime_rate, data = Boston_census)
+Crime_rate = Boston_census[,5]
+Crime_rate
+log_crime_rate <- log(Crime_rate)
+log_crime_rate
+bwplot(log_crime_rate) #transformerad plot
+#svar: Vi kan säga att enligt beskrivningen ser vi att crime_rate variabeln har medelvärdet är ca 3.67 och histogram kan vi ta reda på en del outlier som påverkar vår medelvärdet. Generellt kan vi säga Boston 1970 har low kriminaliteten.
+```
+:::
+
+#### 💪 Uppgift 1.2
+
+Distrikten tillhör olika stadsdelar som anges i den kategoriska variabeln `town`? Det finns 88 olika sådana stadsdelar (towns).
+
+*Skiljer sig brottsligheten åt mellan de olika stadsdelarna?* Undersök stadsdelarna `Boston East Boston`, `Boston Downtown`, `Cambridge`, samt ytterligare en stadsdel som ni själva väljer. Besvara frågan med hjälp av lämpligt valda figurer och statistiska mått.
+
+::: callout-tip
+Innan ni påbörjar analysen, skapa en ny data frame som enbart innehåller de stadsdelar som ni vill jämföra. Det kan göras till exempel med funktionen `filter()`.
+:::
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 1.2 - Svar
+
+Skriv svaret här.
+
+```{r}
+suppressMessages(library(dplyr))
+Boston_census_new <- filter(Boston_census, town == "Boston East Boston" |town == "Boston Downtown" |town == "Cambridge" | town == "Newton")
+Boston_census_new
+boxplot(crime_rate ~ town, data = Boston_census_new)
+histogram(~ crime_rate | town, data = Boston_census_new,type = "percent")
+favstats(~ crime_rate | town, data = Boston_census_new)
+# Enligt histogram som vi skapade kan vi tydligt se att Boston Downtown har högre crime_rate än de resten grupperna. I och med enligt deskriptiv data som vi fick i figuren 3 där har Boston Downtown högst medelvärdet jämfört med de resten grupperna dvs vi kan dra ett beslut att Boston Downtown har en högre brottslighet än de resten grupperna.
+```
+:::
+
+#### 💪 Uppgift 1.3
+
+Vilka två variabler i datasetet `Boston_census_data` korrelerar mest med brottslighet? Beskriv sambandet mellan brottslighet och var och en av dessa två variabler.
+
+::: callout-tip
+Kom ihåg att korrelation mäter det linjära sambandet mellan *numeriska variabler*.
+:::
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 1.3 - Svar
+
+Skriv svaret här.
+
+```{r}
+suppressMessages(library(mosaic))
+Boston_census_data_13_variables <- Boston_census_data[, c("longitude","latitude","median_home_value","crime_rate","zoned_25k_p","indust_p","NOx","n_rooms_avg","before_1940_p","employ_dist","pupil_teacher_ratio","lower_stat_pct","dist_fenway_park")]
+head(Boston_census_data_13_variables)
+correlation_matrix_Boston <- cor(Boston_census_data_13_variables)
+#vi ser att variabel lower_stat_pct har en stark positiv korrelation ungefär 0,35 till crime_rate, variabel median_home_value har dock en stark negativ korrelation ungeför -0.45 till crime_rate.
+round(correlation_matrix_Boston, 3)
+suppressMessages(library(corrplot))
+corrplot(correlation_matrix_Boston)
+cor(lower_stat_pct ~ Crime_rate, data = Boston_census)
+cor(median_home_value ~ Crime_rate, data = Boston_census)
+```
+:::
+
+## 2. Fastighetsskatt i Boston
+
+I detta avsnitt ska ni analysera fastighetsskatten i Boston med hjälp av variabeln `tax_rate`.
+
+#### 💪 Uppgift 2.1
+
+Vad kan man generellt säga om fastighetsskatten i distrikten? Använd lämpliga figurer och mått för att beskriva fördelningen.
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 2.1 - Svar
+
+Skriv svaret här.
+
+```{r}
+histogram(~tax_rate, data = Boston_census_data, main ="Fastighetsskatten i Boston", type ="count",col="navyblue")
+favstats(~ tax_rate, data = Boston_census)
+densityplot(~ tax_rate, data = Boston_census_data, col = "red")
+```
+:::
+
+#### 💪 Uppgift 2.2
+
+Låt oss skapa en ny variabel `cat_tax` som anger om ett distrikt betalar låg (`low`), medel (`medium`), eller hög (`high`) fastighetsskatt. Vi definerar skattekategorierna enligt
+
+-   `low`: `tax_rate` $\leq$ 250,
+-   `medium`: 250 $<$ `tax_rate` $\leq$ 400,
+-   `high`: `tax_rate` $>$ 400.
+
+Följande kod skapar och lägger till variabeln `cat_tax` i `Boston_census_data`
+
+```{r}
+Boston_census_data$cat_tax <- cut(Boston_census_data$tax_rate, 
+              breaks=c(0, 250, 400, 800),
+              labels=c('Low', 'Medium', 'High'))
+```
+
+Finns det ett samband mellan vilken skattekategori ett distrikt tillhör och dess angränsning till Charles River? Förklara med hjälp av lämplig tabell och figur.
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 2.2 - Svar
+
+Skriv svaret här.
+
+```{r}
+tally(cat_tax ~ borders_charles, data = Boston_census_data, margins=TRUE, format="percent")
+```
+:::
+
+#### 💪 Uppgift 2.3
+
+Hur många procent av alla distrikt i vår data ligger i angränsning till Charles River *och* tillhör en hög skattekategori? Hur stor andel av distrikten med hög skatt ligger *inte* i angränsning till Charles River?
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 2.3 - Svar
+
+Skriv svaret här.
+
+```{r}
+tally(borders_charles ~ cat_tax, data = Boston_census_data, margins=TRUE, format="percent")
+
+```
+:::
+
+#### 💪 Uppgift 2.4
+
+Vilka två variabler i datasetet `Boston_census_data` korrelerar starkast med `tax_rate`? Beskriv det parvisa sambandet mellan `tax_rate` och var och en av dessa två variabler. Vad kan vi säga om kausalitet för vart och ett av sambanden?
+
+::: callout-tip
+Kom ihåg att korrelation är ett mått på linjära samband mellan *numeriska variabler*.
+:::
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 2.4 - Svar
+
+Skriv svaret här.
+
+```{r}
+suppressMessages(library(mosaic))
+#vi ser att variabel lower_stat_pct har en stark positiv korrelation ungefär 0,35 till crime_rate, variabel median_home_value har dock en stark negativ korrelation ungeför -0.45 till crime_rate.
+Boston_census_data_15_variables <- Boston_census_data[, c("longitude","latitude","median_home_value","crime_rate","zoned_25k_p","indust_p","NOx","n_rooms_avg","before_1940_p","employ_dist","radial_access","tax_rate","pupil_teacher_ratio","lower_stat_pct","dist_fenway_park")]
+head(Boston_census_data_15_variables)
+correlation_matrix_Boston <- cor(Boston_census_data_15_variables)
+round(correlation_matrix_Boston, 3)
+corrplot(correlation_matrix_Boston)
+cor(radial_access ~ tax_rate, data = Boston_census)
+cor(indust_p ~ tax_rate, data = Boston_census)
+```
+:::
+
+## 3. Avstånd till Fenway park
+
+I detta avsnitt ska ni undersöka variabeln `dist_fenway_park`, som mäter avståndet mellan ett distrikt och Fenway park (stadion där basebollslaget Boston Red Sox spelar sina hemmamatcher).
+
+Vi kan visualisera Fenway park och distrikten på en karta med hjälp av R-paketet `leaflet`. Följande kod visar platsen för Fenway park och distrikten för observationerna 30 och 45.
+
+```{r}
+#| eval: false
+library(leaflet) # Install if not available
+fenway_park_lat_long <- c(42.346462, -71.097250) # latitude and longitude for Fenway_park
+Boston_map <- leaflet() %>% 
+  addTiles() %>%
+  addMarkers(lat = fenway_park_lat_long[1], lng = fenway_park_lat_long[2], popup="Fenway park") %>%
+  addMarkers(lat = Boston_census_data$latitude[30], lng = Boston_census_data$longitude[30], popup="Observation 30") %>%
+  addMarkers(lat = Boston_census_data$latitude[45], lng = Boston_census_data$longitude[45], popup="Observation 45") 
+
+Boston_map # Show interactive map
+```
+
+#### 💪 Uppgift 3.1
+
+Vilket distrikt i vår data har längst respektive kortast avstånd till Fenway park? Markera ut dessa distrikt i en interaktiv karta tillsammans med Fenway park.
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 3.1 - Svar
+
+Skriv svaret här.
+
+```{r}
+#| eval: false
+dist_fenway_sorted <- Boston_census_data %>% arrange(dist_fenway_park)
+head(dist_fenway_sorted)
+dist_fenway_sorted_hightolow <- Boston_census_data %>% arrange(desc(dist_fenway_park))
+head(dist_fenway_sorted_hightolow)
+
+library(leaflet) # Install if not available
+fenway_park_lat_long <- c(42.346462, -71.097250) # latitude and longitude for Fenway_park
+Boston_map <- leaflet() %>% 
+  addTiles() %>%
+  addMarkers(lat = fenway_park_lat_long[1], lng = fenway_park_lat_long[2], popup="Fenway park") %>%
+  addMarkers(lat = dist_fenway_sorted$latitude[1], lng = dist_fenway_sorted$longitude[1], popup="kortast") %>%
+  addMarkers(lat = dist_fenway_sorted_hightolow$latitude[1], lng = dist_fenway_sorted_hightolow$longitude[1], popup="Observation längst") 
+Boston_map
+```
+:::
+
+#### 💪 Uppgift 3.2
+
+Finns det ett samband mellan `dist_fenway_park` och `crime_rate`?
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 3.2 - Svar
+
+Skriv svaret här.
+
+```{r}
+cor(dist_fenway_park ~ crime_rate, data = Boston_census_data)
+```
+:::
+
+## 4. Enkel linjär regression
+
+I detta avsnitt ska ni anpassa och tolka enkla linjära regressionsmodeller.
+
+#### 💪 Uppgift 4.1
+
+Anpassa en linjär regression med responsvariabeln `NOx` och den förklarande variabeln `employ_dist`. Rita den anpassade regressionslinjen tillsammans med data i en lämplig figur. Beskriv resultaten och tolka modellen. Utför en modellvalidering via en residualanalys och kommentera modellens lämplighet. Om modellen inte anses lämplig, vilka antaganden har inte varit uppfyllda?
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 4.1 - Svar
+
+Skriv svaret här.
+
+```{r}
+#Vi anpassar en enkel linjär regression med responsvariabel utandningsvolymen (NOx) och förklarande variabel längd (employdist) med hjälp av funktionen lm() som står för linear model och sparar resultatet i en variabel vi döper till lm_NOx_vs_employdist.
+lm_NOx_vs_employdist <- lm(NOx ~ employ_dist, data = Boston_census)
+lm_NOx_vs_employdist
+#En sådan funktion är summary() som skriver ut resultaten från regressionen i ett snyggt format.
+summary(lm_NOx_vs_employdist)
+
+plot(NOx ~ employ_dist, data = Boston_census, col = "cornflowerblue", ylim = c(0, 1))
+y_hat <- predict(lm_NOx_vs_employdist)
+head(y_hat)
+lines(Boston_census$employ_dist, y_hat, type = "p", col = "lightcoral")
+abline(lm_NOx_vs_employdist, col = "lightcoral")
+legend(x = "topleft", pch = c(1, 1, NA), lty = c(NA, NA, 1), col = c("cornflowerblue", "lightcoral", "lightcoral"), legend=c("Data", "Predicted", "Fitted line"))
+
+# residualer
+resid <- residuals(lm_NOx_vs_employdist)
+head(resid)
+
+# residualanalys
+plot(Boston_census$employ_dist, resid, xlab= "employ_dist", ylab='Residuals', col = "cornflowerblue") 
+qqnorm(resid, col = "cornflowerblue") # Create normal probability plot for residuals
+qqline(resid, col = "red") # Add a straight line to normal probability plot 
+
+# Den är inte så slumpmässig, inte normalfördelad. 
+# enkel linjär regression 
+
+```
+:::
+
+#### 💪 Uppgift 4.2
+
+Använd modellen i Uppgift 4.1 för att prediktera koncentration av kväveoxider för observation 10, där `employ_dist`=10.5857. Beräkna vad residualen blir för denna observation.
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 4.2 - Svar
+
+Skriv svaret här.
+
+```{r}
+new_x <- data.frame(employ_dist = c(10.5857))
+predict(lm_NOx_vs_employdist, newdata = new_x)
+```
+:::
+
+#### 💪 Uppgift 4.3
+
+Transformera variablerna i Uppgift 4.1 (avgör själv vilken eller vilka av de två som behöver transformeras). Ett förslag är att använda Tukeys cirkel för att hitta lämpliga transformationer. Anpassa en ny linjär regression med de transformerade variablerna. Utför en modellvalidering (efter transformation) via en residualanalys och kommentera modellens lämplighet jämfört med modellen i Uppgift 4.1.
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 4.3 - Svar
+
+Skriv svaret här.
+
+```{r}
+plot(NOx ~ employ_dist, data = Boston_census,col = "cornflowerblue") 
+# Starting point: Both y and x  untransformed (Step 2 in the ladder of powers) 
+plot(sqrt(NOx) ~ sqrt(employ_dist), data = Boston_census, col = "cornflowerblue")
+# y down and x down in the ladder of powers
+plot(log(NOx) ~ log(employ_dist), data = Boston_census, col = "cornflowerblue")
+# y and x down two steps
+
+lm_logNOx_vs_logemploy_dist <- lm(log(NOx) ~ log(employ_dist), data = Boston_census)
+summary(lm_logNOx_vs_logemploy_dist)
+logy_hat <- predict(lm_logNOx_vs_logemploy_dist) # log scale prediction
+y_hat <- exp(logy_hat) # original scale prediction
+head(logy_hat)
+head(y_hat)
+plot(NOx ~ employ_dist, data = Boston_census, col = "cornflowerblue", ylim = c(0, 7)) # Data on original scale
+lines(Boston_census$employ_dist, y_hat, type = "p", col = "lightcoral")
+abline(lm_logNOx_vs_logemploy_dist, col = "lightcoral")
+legend(x = "topleft", pch = c(0,5, 0,5, NA), lty = c(NA, NA, 0,5), col = c("cornflowerblue", "lightcoral", "lightcoral"), legend=c("Data", "Predicted", "Fitted line"))
+
+
+```
+:::
+
+#### 💪 Uppgift 4.4
+
+Plotta den anpassade regressionen från 4.3 i icke-transformerad skala tillsammans med observationerna (också i icke-transformerad skala) i en lämplig figur.
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 4.4 - Svar
+
+Skriv svaret här.
+
+```{r}
+# Write your code here
+```
+:::
+
+#### 💪 Uppgift 4.5
+
+Använd modellen i Uppgift 4.3 för att prediktera koncentration av kväveoxider i icke-transformerad skala för observation 10, där `employ_dist`=10.5857. Beräkna vad residualen blir för denna observation. Kommentera resultaten jämfört med Uppgift 4.2.
+
+::: callout-tip
+Tänk på att ta hänsyn till eventuella transformationer!
+:::
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 4.5 - Svar
+
+Skriv svaret här.
+
+```{r}
+# Write your code here
+```
+:::
+
+## 5. Multipel linjär regression
+
+I detta avsnitt ska ni studera multipel linjära regression.
+
+#### 💪 Uppgift 5.1
+
+Anpassa en linjär regression med responsvariabel logaritmerad `median_home_value` samt förklarande variabler `lower_stat_pct` och dummy-variabeln `borders_charles`. Tolka koefficienten för `borders_charles`.
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 5.1 - Svar
+
+Skriv svaret här.
+
+```{r}
+lm_median_home_value_vs_lower_stat_pct_borders_charles <- lm(median_home_value ~ lower_stat_pct + borders_charles, data = Boston_census)
+summary(lm_median_home_value_vs_lower_stat_pct_borders_charles)
+
+resid_median_multiplereg <- residuals(lm_median_home_value_vs_lower_stat_pct_borders_charles)
+head(resid_median_multiplereg)
+plot(lm_median_home_value_vs_lower_stat_pct_borders_charles$fitted.values, resid_median_multiplereg, xlab= "y_hat", ylab='Residuals', col = "cornflowerblue") 
+qqnorm(resid_median_multiplereg, col = "cornflowerblue") # Create normal probability plot for residuals
+qqline(resid_median_multiplereg, col = "red") # Add a straight line to normal
+```
+:::
+
+#### 💪 Uppgift 5.2
+
+Ni ska nu utforma en modell som predikterar medianhuspriset `median_home_value`. Ni får endast använda följande förklaringsvariabler:
+
+-   `before_1940_p`
+-   `crime_rate`
+-   `radial_access`
+-   `NOx`
+-   `dist_fenway_park`
+
+Ni får själva välja hur många av variablerna som ska ingå i modellen. Ni får göra vilka transformationer ni vill av variablerna, inklusive responsvariabeln.
+
+Pröva er fram metodiskt när ni väljer vilka variabler ni inkluderar i modellen, och när ni bestämmer vilka eventuella transformationer ni använder.
+
+När ni utvärderar olika modeller kan ni förslagsvis börja med att jämföra adjusted R-squared. När ni med hjälp av adjusted R-squared har identifierat två eller tre modeller som ser lovande ut kan ni utvärdera dessa modeller ytterligare i ett andra steg.
+
+I det andra steget ska ni utvärdera hur väl modellerna predikterar data som *inte* använts för att anpassa modellen. Ni kan välja *en av två alternativa metoder*:
+
+1.  Dela in ert dataset i träningsdata och testdata. Anpassa modellen med hjälp av träningsdata, och utvärdera sedan på testdata. Ni kan exempelvis använda de första 350 observationerna som träningsdata och de sista 130 observationerna som testdata.
+2.  Använd korsvalidering. Det är en något mer krävande metod, men också något bättre. Ni kan exempelvis göra korsvalidering med 4 folds (4-fold cross validation). Dela då upp ert dataset i fyra delar (del 1: observationer 1-120, del 2: observationer 121-240, del 3: observationer 241-360, del 4: observationer 361-480).
+
+*Sortera inte observationerna i `Boston_census_data` slumpmässigt. Ordningen är redan slumpmässig.*
+
+::: callout-tip
+Tänk på att ta hänsyn till eventuell transformation av responsvariabeln. Om ni exempelvis har valt transformationen $\log(y)$ är modellens prediktion av responsvariabeln $\widehat{\log(y)}$. Ni måste då transformera den till $\hat y$ i responsvariabelns originalskala med formeln $\hat{y}=\exp\left(\widehat{\log(y)}\right)$. Sedan kan ni räkna ut residualen $y - \hat y$.
+:::
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 5.2 - Svar
+
+Skriv svaret här
+
+```{r}
+plot(median_home_value ~ before_1940_p + NOx, data = Boston_census, col = "cornflowerblue")
+
+lm_sqrtmedian_home_value_vs_before_1940_p_NOx <- lm(sqrt(median_home_value) ~ before_1940_p ~ NOx, data = Boston_census)
+sqrty_hat <- predict(lm_sqrtDHR_vs_duration) # sqrt scale prediction
+y_hat <- sqrty_hat^2 # original scale prediction
+plot(dive_heart_rate ~ duration, data = penguins, col = "cornflowerblue", ylim = c(0, 140), main = "Model 1") # Data on original scale
+lines(penguins$duration, y_hat, type = "p", col = "lightcoral")
+legend(x = "topright", pch = c(1, 1), col = c("cornflowerblue", "lightcoral"), legend=c("Data", "Predicted"))
+# Write your code here
+```
+:::
+
+#### 💪 Uppgift 5.3
+
+Gör en residualanalys av den valda modellen i Uppgift 5.2.
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 5.3 - Svar
+
+Skriv svaret här.
+
+```{r}
+# Write your code here
+```
+:::
+
+#### 💪 Uppgift 5.4
+
+Använd modellen i Uppgift 5.2 för att prediktera medianhuspriset för observationerna i datasetet `Boston_districts_to_predict` ([ladda ner](https://github.com/StatisticsSU/SDA1/blob/main/assignments/assignment1/Boston_districts_to_predict.RData?raw=true)).
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 5.4 - Ladda hem data för prediktion
+
+Ladda in dataseten `Boston_districts_to_predict` med följande kod.
+
+```{r}
+# Write your code here
+load(file = url("https://github.com/StatisticsSU/SDA1/blob/main/assignments/assignment1/Boston_districts_to_predict.RData?raw=true")) 
+```
+:::
+
+Det här datasetet har endast de förklarande variablerna, dvs inte responsvariabeln. När vi rättar era inlämningsuppgifter kommer vi att jämföra era prediktioner med de faktiska medianpriserna (som vi har tillgång till).
+
+Skriv ut dina prediktioner så att vi enkelt kan se dem när vi rättar.
+
+::: callout-tip
+Tänk på att ta hänsyn till eventuella transformationer av förklaringsvariablerna!
+:::
+
+::: {.callout-note appearance="minimal"}
+# Uppgift 5.4 - Svar
+
+Skriv svaret här.
+
+```{r}
+# Write your code here
+```
+:::
