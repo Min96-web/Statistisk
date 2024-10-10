@@ -1,0 +1,286 @@
+---
+title: "Statistik och dataanalys II, 15 hp "
+subtitle: "Inlämningsuppgift 1, 2.5 hp"
+author: 
+- Johanna Selö
+- Minhui Zhong
+- Emil Fagerlund
+- William Olsson Lundgren
+date: last-modified
+format: 
+  html:
+    self-contained: true
+    code-line-numbers: true
+  pdf: default  
+  docx: default
+toc: true
+language: 
+  title-block-author-single: " "
+toc-title-document: "Innehåll"
+crossref-fig-title: "Figur"
+theme: Superhero
+title-block-banner-color: Primary
+title-block-published: "Publicerad"
+author-title: "Gruppmedlemmar"
+title-block-banner: true
+callout-warning-caption: "Varning"
+callout-note-caption: "Observera"
+callout-tip-caption: "Tips"
+editor: visual
+---
+
+# Introduktion
+
+```{r}
+#| echo: false 
+#| output: false
+library(tidyverse)
+library(remotes)
+library(sda123)
+library(SUdatasets)
+```
+
+För varje (del)uppgift ska ni inkludera en kort sammanfattning av uppgiften samt ert svar. Svaret ska innehålla en beskrivning av vad ni har gjort, samt era slutsatser och tolkningar.
+
+# Del 1 - Linjär regression med interaktionseffekter
+
+```{r}
+#| echo: false 
+#| output: false
+#remotes::install_github("avehtari/ROS-Examples", subdir = "rpackage")
+library(rosdata)
+```
+
+```{r}
+earnings <- tibble(earnings)
+earnings
+```
+
+Er uppgift är att skatta en linjär regressionsmodell med årlig inkomst i USD (**earn**) som responsvariabel. Med hjälp av denna modell ska ni undersöka om sambandet mellan inkomst och utbildningsnivå (antal år, **education**) skiljer sig beroende på kön (**male**) eller inte.
+
+## 1a - Deskriptiv analys
+
+-   Skapa ett nytt dataset baserat på **earnings** som endast innehåller variablerna i listan ovan.
+
+-   Exkludera alla observationer för vilka **earn** = 0.
+
+-   Exkludera alla observationer som inte är kompletta. Använd funktionen **drop_na()** för att skapa ett dataset som endast innehåller kompletta observationer.
+
+```{r}
+earnings_new <- earnings %>% select(earn, height, weight, male, ethnicity, education, age) %>% filter(earn > 0) %>% mutate(logearn = log(earn))
+earnings_new <- drop_na(earnings_new)
+earnings_new
+```
+
+-   Gör en deskriptiv analys av dem olika variablerna i datasetet (exempelvis stapeldiagram för kategoriska variabler och histogram för numeriska). Finns det några outliers? Bör dessa tas bort?
+
+```{r}
+suppressMessages(library(mosaic))
+ggplot(data = earnings_new, aes(x = logearn)) +
+     geom_histogram(bins = 30)
+ggplot(data = earnings_new, aes(x = height)) +
+     geom_histogram()
+ggplot(data = earnings_new, aes(x = weight )) +
+     geom_histogram()
+ggplot(data = earnings_new, aes(x = age )) +
+     geom_histogram()
+bargraph(~ male, data = earnings_new, type = "proportion")
+bargraph(~ ethnicity, data = earnings_new, type = "proportion")
+bargraph(~ education, data = earnings_new, type = "proportion")
+```
+
+```{r}
+# plocka bort outliers
+earnings_new <- earnings_new %>% filter(logearn < 12.5, logearn > 6)
+# en deskriptiv analys av sambandet mellan earn(responsvariabeln) och övriga variabler
+earnings_new %>% group_by(male) %>% summarise(avg = mean(logearn),sd = sd(logearn))
+```
+
+```{r}
+library(ggplot2)
+ggplot(earnings_new, aes(x = age, y = earn)) +
+  geom_point() +
+  labs(title = "Spridningsdiagram", x = "age", y = "earn")
+```
+
+## 1b - Populationsmodellen
+
+Svara på frågan om sambandet mellan **earn** och **education** skiljer sig åt mellan kvinnor och män.
+
+-   Skapa en ny centrerad version av education, **education_c** genom att subtrahera mean(education) från education.
+
+```{r}
+earnings_new <- earnings_new %>% mutate(education_c = education - mean(education))
+earnings_new
+```
+
+```{r}
+earnings_new <- earnings_new %>% mutate(age_c = age - mean(age))
+earnings_new
+```
+
+-   Formulera en populationsmodell som låter er besvara frågan ovan. Motivera vilka prediktorer ni inkluderar urifrån 1a. Det är fritt fram att inkludera så många prediktorer som ni vill!
+
+earn = B0 + B1education_c+ B2ethnicity + B3Male
+
+```{r}
+popmodel <- lm(earn ~ education_c + ethnicity + male, earnings_new)
+reg_summary(lm(popmodel))
+```
+
+# Del 2 - Multipel regression
+
+## 2a - F-test av restriktioner
+
+I den här övningen ska ni formulera två modeller, och sen jämföra dem med ett F-test. Den första modellen ska vara en enkel modell som är lätt att tolka. Den får som mest ha en numerisk och en kategorisk prediktor. Den andra modellen får vara hur komplex som helst, men måste innehålla alla prediktorer i den enklare modellen, plus minst två prediktorer till.
+
+-   Försök identifiera den bästa enkla regressionsmodellen ni kan baserat på R2. Modellen ska innehålla en numerisk prediktor och upp till en kategorisk prediktor. För att jämförelsen ska vara giltig så måste responsvariabeln vara på samma skala för varje modell. Ni kan alltså använda orginalskala för alla, eller exempelvis logskala för alla, men inte jämföra modeller på orginal- och logskala.
+
+```{r}
+# Restricted 
+#install.packages("corrr")
+library(corrr)
+
+earnings_new <- earnings_new %>% mutate(white = ifelse(ethnicity == "White", 1, 0), 
+                        hispanic = ifelse(ethnicity == "Hispanic", 1, 0), 
+                        other = ifelse(ethnicity == "Other", 1, 0), 
+                        black = ifelse(ethnicity == "Black", 1, 0))
+
+correlate(earnings_new)
+
+enkel <- lm(logearn ~ education + ethnicity, earnings_new)
+reg_summary(lm(enkel))
+```
+
+-   Plotta den enkla regressionsmodellen på samma sätt som ni gjorde i uppgift 2b i labb 1.
+
+```{r}
+#Unrestricted 
+full_modell <- lm(logearn ~ education + ethnicity + male + height + age, earnings_new)
+reg_summary(lm(full_modell))
+
+```
+
+```{r}
+ggplot(earnings_new, aes(x = education, y = logearn, col = ethnicity)) +
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+-   Försök identifiera den bästa regressionsmodellen ni kan baserat på R2. Modellen ska innehålla samma som ovan plus minst två predikktorer till.
+
+```         
+```
+
+-   Använd ett F-test för att formellt jämföra dem två modellerna. Ställ upp testet ordentligt, dvs specificera noll- och alternativhypotes, teststatistika, förkastelseområde samt slutsats. Använd a = 0.05.
+
+H0 = B3 = B4 = B5 = 0
+
+HA = Bj är skilt från 0 där j 3, 4, 5
+
+(R2 fulla modell - R2 restricted) / antal prediktor - restric prediktor / 1 - r2 fulla modellen /n-k-1
+
+0.22 - 0.1218 = 0.0982 / 3 = 0.0327333 / 0.78 / 1599 = 67.1032 = Teststatistika
+
+qf = 2.21
+
+Förkastar nollhyposten och fastslår att den fulla modellen är mer lämplig att använda på 5% signifikansnivå.
+
+-   Skriv ner dom matematiska uttrycken för �2 och justerad �2. Hur stor är skillnaden i �2 mellan dom två modellerna? Hur stor är skillnaden i justerad �2?
+
+**FULL MODELL:**
+
+R2 = SSR/SST = 271.63 / 1234.57 = 0.2200
+
+R2adjusted = 1 - (SSE/n-p-1) / (SST/(n-1)) = 0.21169
+
+**REDUCERAD MODELL:**
+
+R2 = SSR/SST = 150.34 / 1234.57 = 0.1218
+
+R2adjusted = 1 - (SSE/n-p-1) / (SST/(n-1)) = 0.11957
+
+```{r}
+
+qf(0.95, 5, 1599)
+
+qf(1-0.05, df1 = 5, df2 = 1599)
+```
+
+## 2b - Whites test
+
+H0 = feltermerna har samma varians (homoskedastiska)
+
+HA = feltermerna har olika varians (heteroskedastiska)
+
+```{r}
+
+earnings_new <- earnings_new %>% mutate(e2 = enkel$residuals^2) %>% mutate(education2 = education^2)
+
+
+reg_white <- lm(logearn ~ education + education2 + ethnicity + education:ethnicity, earnings_new) 
+reg_summary(lm(reg_white))
+
+```
+
+Teststatiska: 0.12572 · 1605 = 201.7806
+
+```{r}
+qchisq(0.95, 4)
+```
+
+Vi förkastar H0 på 5% signifikansnivå.
+
+## Del 4 - Konstruera en tentafråga
+
+Block 1: F2-F3 Linjär regression med interaktionseffekter - tidyverse och ggplot2
+
+Block 2: Multipel linjär regression F4-F5 F-test, multikollinearitet, modellantaganden och VIF
+
+Block3: Logistisk regression F6-F8 Logistisk regression, maximum likelihood, klassificering, kNN(maskininlärning)
+
+En fråga i en block ska ingå två frågor som är både enkel och svår.
+
+## **F-test för jämförelse mellan modeller**
+
+I den här uppgiften ska du använda ett F-test för att undersöka om det är en bra att inkludera etnicitet i följande modell: earn = 𝛽0 + 𝛽1education + 𝛽2male + 𝛽3ethnicity + 𝛽4age + 𝜀
+
+```{r}
+earnings_new$male <- as.factor(earnings_new$male)
+full_model <- lm(logearn ~ education + male + ethnicity + age, earnings_new)
+reg_summary(full_model) 
+reducerad_model <- lm(logearn ~ education + male + age, earnings_new)
+reg_summary(reducerad_model)
+```
+
+1\. Beräkna värdet på teststatistikan.
+
+F-test H0:beta 3 = beta 4=beta5=0
+
+H1:Inga restriktioner på regressionskoefficienterna
+
+För att utför ett F-test i de två modellen kräver vi ta reda på (( RFM\^2-RRM\^2)/(p-q))/((1-RFM\^2)/(n-p-1)
+
+Vi vet att RFM\^2 = 0.21815, RRM\^2 = 0.21578, n=1600, p=6, q=3
+
+Fobs = ((0.21815-0.21578)/(6-3))/((1-0.21815)/(1600-6-1)) ≈ 0.00079/0.0004908035 ≈ 1.609605
+
+enligt qt funktion i r fick jag ca 2.09 som Fcrit
+
+2.Beräkna det kritiska värdet med hjälp av qf() för 𝛼 = 0.1. Vad blir din slutsats?
+
+```{r}
+n <- nrow(earnings_new)
+qf(1 - 0.1, df1 = 3 , df2 = 1600 - 6 - 1)
+```
+
+alltså jag fick att Fobs \< Fcrit då kan ej förkasta jag H0.
+
+3.  Beräkna VIF med hjälp av förklaringsgraden.
+
+Beräkna VIF för etnicitet: För att beräkna ut VIF krävs vi R2-adj från modellen som igår etnicitet. Då jag fick 0.21815 i full_model.
+
+```{r}
+1/(1-0.21815)
+#Tumregel: VIF > 10 är stark multikollinearitet.
+```

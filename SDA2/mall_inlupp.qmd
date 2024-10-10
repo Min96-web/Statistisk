@@ -1,0 +1,107 @@
+---
+title: "Statistik och dataanalys II, 15 hp "
+subtitle: "Inlämningsuppgift 1, 2.5 hp"
+author: 
+- Namn 1
+- Namn 2
+- Namn 3
+- Namn 4
+date: last-modified
+format: 
+  html:
+    self-contained: true
+    code-line-numbers: true
+  pdf: default  
+  docx: default
+toc: true
+language: 
+  title-block-author-single: " "
+toc-title-document: "Innehåll"
+crossref-fig-title: "Figur"
+theme: Superhero
+title-block-banner-color: Primary
+title-block-published: "Publicerad"
+author-title: "Gruppmedlemmar"
+title-block-banner: true
+callout-warning-caption: "Varning"
+callout-note-caption: "Observera"
+callout-tip-caption: "Tips"
+editor: visual
+---
+
+```{r}
+library(tidyverse) #| echo: false
+library(remotes)
+#install_github("StatisticsSU/sda1paket")
+library(sda1)
+library(dplyr)
+```
+
+```{r}
+#remotes::install_github("avehtari/ROS-Examples", subdir = "rpackage")
+library(rosdata)
+```
+
+```{r}
+df <- tibble(earnings)
+df
+```
+
+```{r}
+new_df <- df %>% filter(!(earn=="0"))
+my_df <- drop_na(new_df)
+```
+
+```{r}
+#earn,height,weight,male,ethnicity,education,age
+#stapeldiagram för kategoriska variabler och histogram för numeriska
+suppressMessages(library(mosaic))
+ggplot(data = my_df, aes(x = earn )) +
+     geom_histogram()
+ggplot(data = my_df, aes(x = height)) +
+     geom_histogram()
+ggplot(data = my_df, aes(x = weight )) +
+     geom_histogram()
+ggplot(data = my_df, aes(x = age )) +
+     geom_histogram()
+bargraph(~ male, data = my_df, type = "proportion")
+bargraph(~ ethnicity, data = my_df, type = "proportion")
+bargraph(~ education, data = my_df, type = "proportion")
+```
+
+```{r}
+#bort favstats(~ male, data = my_df) #bort
+#bort new_ethnicity <- as.numeric(my_df$ethnicity)
+#bort favstats(~ new_ethnicity, data = my_df)
+#bort favstats(~ education, data = my_df)
+my_df %>%
+group_by(male) %>%
+summarise(avg = mean(earn),sd = sd(earn)) 
+my_df %>%
+group_by(ethnicity) %>%
+summarise(avg = mean(earn),sd = sd(earn)) 
+my_df %>%
+group_by(education) %>%
+summarise(avg = mean(earn),sd = sd(earn)) 
+```
+
+```{r}
+library(ggplot2)
+ggplot(my_df, aes(x = male, y = earn)) +
+  geom_point() +
+  labs(title = "Spridningsdiagram", x = "male", y = "earn")
+ggplot(my_df, aes(x = ethnicity, y = earn)) +
+  geom_point() +
+  labs(title = "Spridningsdiagram", x = "ethnicity", y = "earn")
+ggplot(my_df, aes(x = education, y = earn)) +
+  geom_point() +
+  labs(title = "Spridningsdiagram", x = "male", y = "earn")
+```
+
+```{r}
+# Skapa centrerad version av education och age
+education_c <- my_df$education - mean(my_df$education)
+# Formulera populationsmodell
+modell1 <- lm(earn ~ male + education_c + age, data = my_df)
+reg_summary(modell1)
+```
